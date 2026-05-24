@@ -1,0 +1,50 @@
+# Environment
+.env
+.env.*
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads / user content
+uploads/
+*.pdf
+*.txt
+
+# Logs
+*.log
+logs/
+
+# Distribution / build
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8001/health\")",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8001/ai/status\")",
+      "PowerShell(Stop-Process -Name \"python\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name \"python\",\"node\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "Bash(python -c ' *)",
+      "Bash(curl -s http://localhost:8010/bookings)",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://localhost:8010/slots)",
+      "Bash(curl -s -X POST http://localhost:8010/messages -H \"Content-Type: application/json\" -d \"{\\\\\"conversation_id\\\\\": \\\\\"conv_website_1\\\\\", \\\\\"body\\\\\": \\\\\"I want to book an appointment\\\\\"}\")",
+      "Bash(curl -s -X POST http://localhost:8010/messages -H \"Content-Type: application/json\" -d \"{\\\\\"conversation_id\\\\\": \\\\\"conv_website_1\\\\\", \\\\\"body\\\\\": \\\\\"9 AM today works for me\\\\\"}\")",
+      "Bash(curl -s http://localhost:8010/conversations)",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(.venv/Scripts/pip show *)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(curl -s http://localhost:8010/health)",
+      "Read(//c/Users/Priya/AppData/Local/Temp/claude/c--Users-Priya-OneDrive-Desktop-OmniFlow-AI/419db537-7c96-4035-9379-1952bc1ce903/tasks/**)",
+      "PowerShell(curl -s http://localhost:8010/health 2>&1)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8010/health\" -UseBasicParsing 2>&1)",
+      "PowerShell(netstat -ano)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "PowerShell($env:PGPASSWORD = \"vinay2004\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)",
+      "PowerShell(Stop-Process -Name \"python\" -Force 2>$null)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8010/analytics\" -Method GET)",
+      "Bash(npx tsc *)",
+      "Bash(.venv\\\\Scripts\\\\python.exe seed.py --fresh)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/main.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
+    ]
+  }
+}
