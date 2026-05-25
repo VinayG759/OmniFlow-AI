@@ -59,3 +59,10 @@ next-env.d.ts
 
 # Uploads
 uploads/
+
+# Claude Code
+.claude/
+
+# Google credentials (never commit service account keys)
+google_credentials.json
+backend/google_credentials.json
