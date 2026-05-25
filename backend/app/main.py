@@ -56,6 +56,21 @@ wa_phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 wa_access_token    = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 wa_verify_token    = os.getenv("WHATSAPP_VERIFY_TOKEN", "omniflow-webhook-secret")
 
+# ── Facebook Messenger config ─────────────────────────────────────────────────
+
+fb_page_access_token = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
+fb_verify_token      = os.getenv("FB_VERIFY_TOKEN", "omniflow-fb-secret")
+
+# ── Instagram Messaging config ────────────────────────────────────────────────
+
+ig_page_access_token = os.getenv("IG_PAGE_ACCESS_TOKEN", "")
+ig_verify_token      = os.getenv("IG_VERIFY_TOKEN", "omniflow-ig-secret")
+
+# ── Google Sheets config ──────────────────────────────────────────────────────
+
+gs_credentials_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+gs_sheet_id         = os.getenv("GOOGLE_SHEETS_ID", "")
+
 
 def send_whatsapp_reply(to: str, body: str) -> None:
     """Send a WhatsApp text message back to the customer via the Cloud API."""
@@ -80,10 +95,74 @@ def send_whatsapp_reply(to: str, body: str) -> None:
         pass  # never crash the webhook handler if the outbound call fails
 
 
+def send_facebook_reply(recipient_psid: str, body: str) -> None:
+    """Send a Facebook Messenger reply via the Graph API."""
+    if not fb_page_access_token:
+        return
+    try:
+        http_requests.post(
+            "https://graph.facebook.com/v18.0/me/messages",
+            params={"access_token": fb_page_access_token},
+            json={
+                "recipient": {"id": recipient_psid},
+                "message": {"text": body},
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def send_instagram_reply(recipient_id: str, body: str) -> None:
+    """Send an Instagram DM reply via the Graph API."""
+    if not ig_page_access_token:
+        return
+    try:
+        http_requests.post(
+            "https://graph.facebook.com/v18.0/me/messages",
+            params={"access_token": ig_page_access_token},
+            json={
+                "recipient": {"id": recipient_id},
+                "message": {"text": body},
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def sync_lead_to_sheets(lead_row) -> None:
+    """Auto-append a newly captured lead to Google Sheets (if configured)."""
+    if not gs_credentials_path or not gs_sheet_id:
+        return
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials as GCredentials
+        creds = GCredentials.from_service_account_file(
+            gs_credentials_path,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        gc = gspread.authorize(creds)
+        ws = gc.open_by_key(gs_sheet_id).sheet1
+        # Add header row if the sheet is empty
+        if not ws.get_all_values():
+            ws.append_row(["Name", "Email", "Phone", "Interest", "Channel", "Captured At"])
+        ws.append_row([
+            lead_row.customer_name or "",
+            lead_row.email or "",
+            lead_row.phone or "",
+            lead_row.interest or "",
+            lead_row.channel or "",
+            lead_row.created_at or "",
+        ])
+    except Exception:
+        pass  # Sheets sync is optional — never crash the main flow
+
+
 # ── Pydantic response schemas ─────────────────────────────────────────────────
 
 Sender             = Literal["user", "ai", "human"]
-Channel            = Literal["website", "whatsapp", "email"]
+Channel            = Literal["website", "whatsapp", "email", "facebook", "instagram"]
 ConversationStatus = Literal["active", "lead", "booked", "escalated"]
 
 
@@ -1048,6 +1127,39 @@ def create_lead(payload: LeadCreate, db: Session = Depends(get_db)) -> Lead:
     return row_to_lead(lead_row)
 
 
+@app.post("/leads/sync-sheets")
+def sync_all_leads_to_sheets(db: Session = Depends(get_db)) -> dict:
+    """Push all leads to the configured Google Sheet.
+    Returns {"synced": N} — 0 if Sheets is not configured.
+    """
+    if not gs_credentials_path or not gs_sheet_id:
+        return {"synced": 0, "note": "Google Sheets not configured"}
+    leads = db.query(LeadRow).order_by(LeadRow.created_at).all()
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials as GCredentials
+        creds = GCredentials.from_service_account_file(
+            gs_credentials_path,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        gc = gspread.authorize(creds)
+        ws = gc.open_by_key(gs_sheet_id).sheet1
+        ws.clear()
+        ws.append_row(["Name", "Email", "Phone", "Interest", "Channel", "Captured At"])
+        for lead in leads:
+            ws.append_row([
+                lead.customer_name or "",
+                lead.email or "",
+                lead.phone or "",
+                lead.interest or "",
+                lead.channel or "",
+                lead.created_at or "",
+            ])
+        return {"synced": len(leads)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sheets sync failed: {e}")
+
+
 @app.get("/slots")
 def list_slots(db: Session = Depends(get_db)) -> dict[str, list[str]]:
     return {"available": get_available_slots(db)}
@@ -1361,13 +1473,17 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
         conv_row.status = "lead"
 
     # Phase 6 — auto-capture lead (staged, committed below)
-    try_capture_lead(conv_row, payload.body, full_history, db)
+    new_lead = try_capture_lead(conv_row, payload.body, full_history, db)
 
     if ai_source == "mock" and ai_provider == "openai":
         conv_row.last_message = f"{conv_row.last_message} (mock fallback)"
 
     # Single commit for everything in this request
     db.commit()
+
+    # Sync newly captured lead to Google Sheets (no-op if not configured)
+    if new_lead:
+        sync_lead_to_sheets(new_lead)
 
     # Return the full conversation thread
     rows = (
@@ -1456,6 +1572,121 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass  # swallow all errors — always return 200 to Meta
 
+    return {"status": "ok"}
+
+
+# ── Facebook Messenger Webhooks ───────────────────────────────────────────────
+
+@app.get("/webhooks/facebook")
+def facebook_verify(request: Request):
+    """Meta webhook verification handshake for Facebook Messenger."""
+    params = request.query_params
+    if (
+        params.get("hub.mode") == "subscribe"
+        and params.get("hub.verify_token") == fb_verify_token
+    ):
+        return PlainTextResponse(params.get("hub.challenge", ""))
+    raise HTTPException(status_code=403, detail="Webhook verification failed.")
+
+
+@app.post("/webhooks/facebook", status_code=200)
+async def facebook_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive inbound Facebook Messenger messages.
+    Parses the Messenger payload, runs AI, sends reply back via Graph API.
+    Always returns 200 — non-200 causes Meta to retry endlessly.
+    """
+    try:
+        payload = await request.json()
+        if payload.get("object") != "page":
+            return {"status": "ok"}
+        for entry in payload.get("entry", []):
+            for messaging in entry.get("messaging", []):
+                message = messaging.get("message", {})
+                if message.get("is_echo"):
+                    continue  # skip our own outbound messages echoed back
+                text = message.get("text", "")
+                if not text:
+                    continue
+                sender_psid = messaging["sender"]["id"]
+                conv_id     = f"fb_{sender_psid}"
+                conv_row    = db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+                if conv_row is None:
+                    conv_row = ConversationRow(
+                        id=conv_id,
+                        customer_name=f"FB User …{sender_psid[-4:]}",
+                        channel="facebook",
+                        status="active",
+                        last_message="",
+                        updated_at=utc_now(),
+                        unread_count=0,
+                    )
+                    db.add(conv_row)
+                    db.commit()
+                    db.refresh(conv_row)
+                thread  = send_message(MessageCreate(conversation_id=conv_id, body=text), db)
+                ai_msgs = [m for m in thread if m.sender in ("ai", "human")]
+                if ai_msgs:
+                    send_facebook_reply(sender_psid, ai_msgs[-1].body)
+    except Exception:
+        pass
+    return {"status": "ok"}
+
+
+# ── Instagram Messaging Webhooks ──────────────────────────────────────────────
+
+@app.get("/webhooks/instagram")
+def instagram_verify(request: Request):
+    """Meta webhook verification handshake for Instagram Messaging."""
+    params = request.query_params
+    if (
+        params.get("hub.mode") == "subscribe"
+        and params.get("hub.verify_token") == ig_verify_token
+    ):
+        return PlainTextResponse(params.get("hub.challenge", ""))
+    raise HTTPException(status_code=403, detail="Webhook verification failed.")
+
+
+@app.post("/webhooks/instagram", status_code=200)
+async def instagram_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive inbound Instagram DMs.
+    Instagram messaging uses the same Messenger-style payload structure.
+    Always returns 200.
+    """
+    try:
+        payload = await request.json()
+        # Instagram webhooks send object = "instagram"
+        if payload.get("object") not in ("instagram", "page"):
+            return {"status": "ok"}
+        for entry in payload.get("entry", []):
+            for messaging in entry.get("messaging", []):
+                message = messaging.get("message", {})
+                if message.get("is_echo"):
+                    continue
+                text = message.get("text", "")
+                if not text:
+                    continue
+                sender_id = messaging["sender"]["id"]
+                conv_id   = f"ig_{sender_id}"
+                conv_row  = db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+                if conv_row is None:
+                    conv_row = ConversationRow(
+                        id=conv_id,
+                        customer_name=f"Instagram User …{sender_id[-4:]}",
+                        channel="instagram",
+                        status="active",
+                        last_message="",
+                        updated_at=utc_now(),
+                        unread_count=0,
+                    )
+                    db.add(conv_row)
+                    db.commit()
+                    db.refresh(conv_row)
+                thread  = send_message(MessageCreate(conversation_id=conv_id, body=text), db)
+                ai_msgs = [m for m in thread if m.sender in ("ai", "human")]
+                if ai_msgs:
+                    send_instagram_reply(sender_id, ai_msgs[-1].body)
+    except Exception:
+        pass
     return {"status": "ok"}
 
 

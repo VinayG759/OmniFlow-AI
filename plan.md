@@ -1221,130 +1221,13 @@ WHATSAPP_VERIFY_TOKEN=omniflow_verify_2024
 
 ---
 
-## Phase 19 — Multi-Channel Connections (4 Hours)
-
-### Goal
-Connect additional customer channels — Email and Instagram DMs — all routing into the same unified inbox with zero UI changes needed.
-
----
-
-### 19a — Email Channel (2 Hours)
-
-#### How It Works
-```text
-Customer emails support@yourdomain.com
-          |
-          v
-Email forwarding / Mailgun inbound parse
-          |
-          v
-POST /webhooks/email  (your backend)
-          |
-          v
-Create conversation with channel = "email"
-          |
-          v
-AI replies → send via Mailgun/SMTP
-          |
-          v
-Appears in Unified Inbox with ✉️ badge
-```
-
-#### Requirements
-- Mailgun free account (5,000 emails/month free)
-- Domain with MX record pointed to Mailgun (or use their sandbox)
-- OR: Gmail "forward to" → Zapier/Make webhook → your `/webhooks/email`
-
-#### New env vars
-```text
-MAILGUN_API_KEY=
-MAILGUN_DOMAIN=
-```
-
-#### Backend Changes
-- `POST /webhooks/email` — parse sender, subject, body
-- Create conversation with `channel = "email"`, `customer_name` from sender name
-- AI response sent via Mailgun `POST /messages`
-
----
-
-### 19b — Instagram DMs (2 Hours)
-
-#### How It Works
-```text
-Customer DMs your Instagram account
-          |
-          v
-Meta Webhooks  →  POST /webhooks/instagram
-          |
-          v
-Same normalisation as WhatsApp
-          |
-          v
-AI replies via Instagram Graph API
-          |
-          v
-Appears in Unified Inbox with 📷 Instagram badge
-```
-
-#### Requirements
-- Meta Developer Account (same as WhatsApp)
-- Instagram Business or Creator account
-- Connected Facebook Page
-- Instagram Graph API access
-
-#### Backend Changes
-- `POST /webhooks/instagram` — parse DM payload
-- Same AI pipeline, `channel = "instagram"`
-- Reply via `POST /{instagram-user-id}/messages`
-
----
-
-### 19c — CRM Sync — HubSpot (Optional, 1 Hour)
-
-#### Goal
-When a lead is captured in OmniFlow, automatically create a contact in HubSpot CRM.
-
-#### How It Works
-```text
-OmniFlow captures lead
-          |
-          v
-POST /leads  triggers CRM sync (background task)
-          |
-          v
-HubSpot API  →  Create Contact
-```
-
-#### New env vars
-```text
-HUBSPOT_API_KEY=
-```
-
-#### Backend Changes
-- After `LeadRow` is inserted, fire `BackgroundTask` to call HubSpot Contacts API
-- `POST https://api.hubapi.com/crm/v3/objects/contacts`
-- Map: `customer_name` → `firstname + lastname`, `email` → `email`, `phone` → `phone`
-
-### Review Checklist
-- [ ] Email inbound creates conversation in inbox
-- [ ] AI reply sent back to customer email
-- [ ] Instagram DM appears in inbox
-- [ ] Channel badges (✉️ 📷 📱) display correctly
-- [ ] HubSpot contact created on lead capture (if key provided)
-
----
-
-## Updated API Surface (Phase 13–19)
+## Updated API Surface (Phase 13–18)
 
 ```text
 PATCH  /conversations/{id}/status     ← Phase 15
 GET    /messages/stream/{conv_id}     ← Phase 13 (SSE)
 POST   /webhooks/whatsapp             ← Phase 18
 GET    /webhooks/whatsapp             ← Phase 18 (verify)
-POST   /webhooks/email                ← Phase 19
-POST   /webhooks/instagram            ← Phase 19
-GET    /webhooks/instagram            ← Phase 19 (verify)
 ```
 
 ---
@@ -1360,7 +1243,6 @@ GET    /webhooks/instagram            ← Phase 19 (verify)
 ### Day 5 (Integrations + polish)
 5. Phase 18 — WhatsApp integration
 6. Phase 16 — Skeletons, empty states, keyboard nav
-7. Phase 19 — Email / Instagram / CRM (priority: Email → Instagram → HubSpot)
 
 ---
 
@@ -1371,7 +1253,6 @@ GET    /webhooks/instagram            ← Phase 19 (verify)
 - [ ] Agent can manually escalate a conversation
 - [ ] Leads exportable as CSV
 - [ ] WhatsApp message flows into inbox
-- [ ] Email message flows into inbox
 - [ ] All channel badges display correctly
 - [ ] No blank loading states
 - [ ] Empty states have helpful CTAs
