@@ -1,5 +1,8 @@
+import json
 import os
 import re
+import time
+import requests as http_requests
 from contextlib import asynccontextmanager
 from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
@@ -8,8 +11,9 @@ from typing import Literal
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from groq import Groq
 from openai import OpenAI
 from pypdf import PdfReader
@@ -45,6 +49,36 @@ openai_client  = OpenAI(api_key=openai_api_key) if openai_api_key else None
 groq_model     = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 groq_api_key   = os.getenv("GROQ_API_KEY")
 groq_client    = Groq(api_key=groq_api_key) if groq_api_key else None
+
+# ── WhatsApp Cloud API config ─────────────────────────────────────────────────
+
+wa_phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+wa_access_token    = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+wa_verify_token    = os.getenv("WHATSAPP_VERIFY_TOKEN", "omniflow-webhook-secret")
+
+
+def send_whatsapp_reply(to: str, body: str) -> None:
+    """Send a WhatsApp text message back to the customer via the Cloud API."""
+    if not wa_phone_number_id or not wa_access_token:
+        return  # credentials not configured — skip silently
+    try:
+        http_requests.post(
+            f"https://graph.facebook.com/v18.0/{wa_phone_number_id}/messages",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {wa_access_token}",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {"body": body},
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass  # never crash the webhook handler if the outbound call fails
+
 
 # ── Pydantic response schemas ─────────────────────────────────────────────────
 
@@ -158,6 +192,11 @@ class DailyCount(BaseModel):
     count: int
 
 
+class NameValue(BaseModel):
+    name:  str
+    value: int
+
+
 class AnalyticsSummary(BaseModel):
     total_conversations: int
     ai_replies:          int
@@ -166,6 +205,8 @@ class AnalyticsSummary(BaseModel):
     escalations:         int
     daily_conversations: list[DailyCount]
     lead_growth:         list[DailyCount]
+    channel_breakdown:   list[NameValue]
+    status_breakdown:    list[NameValue]
 
 
 # ── ORM row → Pydantic converters ─────────────────────────────────────────────
@@ -1126,6 +1167,16 @@ def get_analytics(db: Session = Depends(get_db)) -> AnalyticsSummary:
             if d in days:
                 lead_by_day[d] = lead_by_day.get(d, 0) + 1
 
+    # Channel breakdown
+    channel_counts: dict[str, int] = {}
+    for (ch,) in db.query(ConversationRow.channel).all():
+        channel_counts[ch] = channel_counts.get(ch, 0) + 1
+
+    # Status breakdown
+    status_counts: dict[str, int] = {}
+    for (st,) in db.query(ConversationRow.status).all():
+        status_counts[st] = status_counts.get(st, 0) + 1
+
     return AnalyticsSummary(
         total_conversations=total_conversations,
         ai_replies=ai_replies,
@@ -1134,6 +1185,8 @@ def get_analytics(db: Session = Depends(get_db)) -> AnalyticsSummary:
         escalations=escalations,
         daily_conversations=[DailyCount(date=d, count=conv_by_day.get(d, 0)) for d in days],
         lead_growth=[DailyCount(date=d, count=lead_by_day.get(d, 0)) for d in days],
+        channel_breakdown=[NameValue(name=k.capitalize(), value=v) for k, v in channel_counts.items()],
+        status_breakdown=[NameValue(name=k.capitalize(), value=v) for k, v in status_counts.items()],
     )
 
 
@@ -1146,6 +1199,27 @@ def escalate_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     conv.status = "escalated"
+    conv.updated_at = utc_now()
+    db.commit()
+    return row_to_conversation(conv)
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+@app.patch("/conversations/{conversation_id}/status", response_model=Conversation)
+def update_conversation_status(
+    conversation_id: str, payload: StatusUpdate, db: Session = Depends(get_db)
+) -> Conversation:
+    """Manually set the status of a conversation (active / lead / booked / escalated / resolved)."""
+    valid = {"active", "lead", "booked", "escalated", "resolved"}
+    if payload.status not in valid:
+        raise HTTPException(status_code=422, detail=f"Status must be one of: {', '.join(sorted(valid))}")
+    conv = db.query(ConversationRow).filter(ConversationRow.id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    conv.status = payload.status
     conv.updated_at = utc_now()
     db.commit()
     return row_to_conversation(conv)
@@ -1303,3 +1377,120 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
         .all()
     )
     return [row_to_message(r) for r in rows]
+
+
+# ── WhatsApp Webhooks ─────────────────────────────────────────────────────────
+
+@app.get("/webhooks/whatsapp")
+def whatsapp_verify(request: Request):
+    """Meta webhook verification handshake (GET).
+    Meta sends hub.mode, hub.challenge, hub.verify_token as query params.
+    We must echo back hub.challenge as plain text to confirm the webhook URL.
+    """
+    params    = request.query_params
+    mode      = params.get("hub.mode", "")
+    challenge = params.get("hub.challenge", "")
+    token     = params.get("hub.verify_token", "")
+    if mode == "subscribe" and token == wa_verify_token:
+        return PlainTextResponse(challenge)
+    raise HTTPException(status_code=403, detail="Webhook verification failed.")
+
+
+@app.post("/webhooks/whatsapp", status_code=200)
+async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive inbound WhatsApp messages (POST).
+    Parses the Meta payload, runs each text message through the AI pipeline,
+    and sends the AI reply back to the customer via WhatsApp Cloud API.
+    Always returns 200 — returning anything else causes Meta to retry endlessly.
+    """
+    try:
+        payload = await request.json()
+        for entry in payload.get("entry", []):
+            for change in entry.get("changes", []):
+                value    = change.get("value", {})
+                messages = value.get("messages", [])
+                contacts = value.get("contacts", [])
+
+                for msg in messages:
+                    if msg.get("type") != "text":
+                        continue  # ignore image/audio/etc. for now
+
+                    from_number = msg["from"]           # e.g. "919876543210"
+                    text_body   = msg["text"]["body"]
+
+                    # Resolve display name from contacts array
+                    customer_name = from_number
+                    for contact in contacts:
+                        if contact.get("wa_id") == from_number:
+                            customer_name = contact.get("profile", {}).get("name", from_number)
+                            break
+
+                    # Stable conversation ID keyed by phone number
+                    conv_id  = f"wa_{from_number}"
+                    conv_row = db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+                    if conv_row is None:
+                        conv_row = ConversationRow(
+                            id=conv_id,
+                            customer_name=customer_name,
+                            channel="whatsapp",
+                            status="active",
+                            last_message="",
+                            updated_at=utc_now(),
+                            unread_count=0,
+                        )
+                        db.add(conv_row)
+                        db.commit()
+                        db.refresh(conv_row)
+
+                    # Run through the full OmniFlow AI pipeline
+                    thread = send_message(
+                        MessageCreate(conversation_id=conv_id, body=text_body),
+                        db,
+                    )
+
+                    # Send AI reply back on WhatsApp
+                    ai_msgs = [m for m in thread if m.sender in ("ai", "human")]
+                    if ai_msgs:
+                        send_whatsapp_reply(from_number, ai_msgs[-1].body)
+
+    except Exception:
+        pass  # swallow all errors — always return 200 to Meta
+
+    return {"status": "ok"}
+
+
+@app.post("/messages/stream")
+def send_message_stream(payload: MessageCreate, db: Session = Depends(get_db)):
+    """Same as POST /messages but streams the AI reply token-by-token via SSE.
+
+    Event format:
+      data: {"type": "token", "token": "<text>"}   — one or more tokens
+      data: {"type": "done",  "messages": [...]}    — full thread, stream finished
+    """
+    # Reuse existing logic — saves user + AI message, runs workflows/RAG/slots
+    thread = send_message(payload, db)
+
+    # Extract the last AI message to stream
+    ai_msgs = [m for m in thread if m.sender in ("ai", "human")]
+    ai_body  = ai_msgs[-1].body if ai_msgs else ""
+    thread_json = [m.model_dump() for m in thread]
+
+    def _stream():
+        if ai_body:
+            words = ai_body.split(" ")
+            for i, word in enumerate(words):
+                token = word if i == 0 else f" {word}"
+                yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+                time.sleep(0.04)          # ~25 words/sec — natural typing speed
+        # Final event carries the authoritative thread so the frontend can
+        # replace optimistic messages with real DB IDs / timestamps.
+        yield f"data: {json.dumps({'type': 'done', 'messages': thread_json})}\n\n"
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx buffering
+        },
+    )
