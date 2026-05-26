@@ -1311,9 +1311,59 @@ def escalate_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     conv.status = "escalated"
-    conv.updated_at = utc_now()
+    now = utc_now()
+    conv.updated_at = now
+
+    # Auto-send a customer-facing handoff message
+    handoff_text = (
+        "Thank you for reaching out! 🙏 I'm connecting you with a human agent "
+        "who will assist you shortly. Please hold on."
+    )
+    handoff_msg = MessageRow(
+        id=str(uuid4()),
+        conversation_id=conversation_id,
+        sender="human",
+        body=handoff_text,
+        created_at=now,
+    )
+    db.add(handoff_msg)
+    conv.last_message = handoff_text
     db.commit()
     return row_to_conversation(conv)
+
+
+class AgentMessageCreate(BaseModel):
+    conversation_id: str = Field(..., min_length=1)
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+@app.post("/messages/agent", response_model=list[Message])
+def send_agent_message(payload: AgentMessageCreate, db: Session = Depends(get_db)) -> list[Message]:
+    """Send a message from a human agent — no AI reply is triggered."""
+    conv_row = db.query(ConversationRow).filter(ConversationRow.id == payload.conversation_id).first()
+    if conv_row is None:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    now = utc_now()
+    msg_row = MessageRow(
+        id=str(uuid4()),
+        conversation_id=payload.conversation_id,
+        sender="human",
+        body=payload.body,
+        created_at=now,
+    )
+    db.add(msg_row)
+    conv_row.last_message = payload.body
+    conv_row.updated_at = now
+    db.commit()
+
+    rows = (
+        db.query(MessageRow)
+        .filter(MessageRow.conversation_id == payload.conversation_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    )
+    return [row_to_message(r) for r in rows]
 
 
 class StatusUpdate(BaseModel):
