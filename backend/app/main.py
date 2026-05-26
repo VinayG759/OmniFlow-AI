@@ -1070,6 +1070,37 @@ def debug_whatsapp():
         return {"status": "error", "reason": str(e)}
 
 
+@app.get("/debug/facebook")
+def debug_facebook():
+    """Test Facebook page token validity and webhook subscription."""
+    if not fb_page_access_token:
+        return {"status": "error", "reason": "FB_PAGE_ACCESS_TOKEN not set in env"}
+    try:
+        # Check token validity
+        resp = http_requests.get(
+            "https://graph.facebook.com/v18.0/me",
+            params={"access_token": fb_page_access_token, "fields": "id,name"},
+            timeout=10,
+        )
+        data = resp.json()
+        if resp.status_code == 200:
+            # Also check webhook subscriptions
+            subs_resp = http_requests.get(
+                f"https://graph.facebook.com/v18.0/{data.get('id')}/subscribed_apps",
+                params={"access_token": fb_page_access_token},
+                timeout=10,
+            )
+            return {
+                "status": "ok",
+                "page": data,
+                "subscriptions": subs_resp.json() if subs_resp.status_code == 200 else {"error": subs_resp.text},
+            }
+        else:
+            return {"status": "error", "http_status": resp.status_code, "meta_response": data}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
 @app.get("/conversations", response_model=list[Conversation])
 def list_conversations(db: Session = Depends(get_db)) -> list[Conversation]:
     rows = db.query(ConversationRow).order_by(ConversationRow.updated_at.desc()).all()
