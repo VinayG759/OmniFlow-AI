@@ -1101,6 +1101,41 @@ def debug_facebook():
         return {"status": "error", "reason": str(e)}
 
 
+@app.post("/debug/facebook/subscribe")
+def debug_facebook_subscribe():
+    """Re-subscribe the page to the app webhook so Meta forwards messages."""
+    if not fb_page_access_token:
+        return {"status": "error", "reason": "FB_PAGE_ACCESS_TOKEN not set in env"}
+    try:
+        # Get page ID first
+        me_resp = http_requests.get(
+            "https://graph.facebook.com/v18.0/me",
+            params={"access_token": fb_page_access_token, "fields": "id,name"},
+            timeout=10,
+        )
+        page_data = me_resp.json()
+        page_id = page_data.get("id")
+        if not page_id:
+            return {"status": "error", "reason": "Could not get page ID", "meta_response": page_data}
+
+        # Subscribe the page to the app for messages
+        sub_resp = http_requests.post(
+            f"https://graph.facebook.com/v18.0/{page_id}/subscribed_apps",
+            params={
+                "access_token": fb_page_access_token,
+                "subscribed_fields": "messages,messaging_postbacks",
+            },
+            timeout=10,
+        )
+        sub_data = sub_resp.json()
+        if sub_resp.status_code == 200 and sub_data.get("success"):
+            return {"status": "ok", "page_id": page_id, "page_name": page_data.get("name"), "subscribed": True}
+        else:
+            return {"status": "error", "http_status": sub_resp.status_code, "meta_response": sub_data}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
 @app.get("/conversations", response_model=list[Conversation])
 def list_conversations(db: Session = Depends(get_db)) -> list[Conversation]:
     rows = db.query(ConversationRow).order_by(ConversationRow.updated_at.desc()).all()
