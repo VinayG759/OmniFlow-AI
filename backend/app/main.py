@@ -1050,6 +1050,26 @@ def ai_status() -> dict[str, str]:
     return {"provider": provider, "model": model}
 
 
+@app.get("/debug/whatsapp")
+def debug_whatsapp():
+    """Test WhatsApp token validity without sending a real message."""
+    if not wa_phone_number_id or not wa_access_token:
+        return {"status": "error", "reason": "WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN not set in env"}
+    try:
+        resp = http_requests.get(
+            f"https://graph.facebook.com/v18.0/{wa_phone_number_id}",
+            headers={"Authorization": f"Bearer {wa_access_token}"},
+            timeout=10,
+        )
+        data = resp.json()
+        if resp.status_code == 200:
+            return {"status": "ok", "phone_number_id": wa_phone_number_id, "meta_response": data}
+        else:
+            return {"status": "error", "http_status": resp.status_code, "meta_response": data}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
 @app.get("/conversations", response_model=list[Conversation])
 def list_conversations(db: Session = Depends(get_db)) -> list[Conversation]:
     rows = db.query(ConversationRow).order_by(ConversationRow.updated_at.desc()).all()
