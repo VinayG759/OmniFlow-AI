@@ -58,7 +58,17 @@ const FAQ: { patterns: string[]; response: string }[] = [
   {
     patterns: ["channel", "whatsapp", "email", "website", "facebook", "instagram", "integration", "connect", "platform", "which platform"],
     response:
-      "OmniFlow currently supports four channels:\n\n• 💬 Website chat widget — embed with a single <script> tag\n• 📱 WhatsApp Business — connect your number via the Cloud API\n• 📘 Facebook Messenger — connect your page via webhook\n• ✉️ Email — forward your support inbox to OmniFlow\n\nAll channels land in the same unified inbox, so your team never misses a message.",
+      "OmniFlow supports five channels:\n\n• 💬 Website chat widget — embed with a single <script> tag\n• 📱 WhatsApp Business — connect your number via the Meta Cloud API\n• 📘 Facebook Messenger — connect your page via webhook\n• 📸 Instagram DMs — connect your business account via Meta webhook\n• 📞 Phone (AI Voice) — Twilio-powered AI answers calls and transcribes them\n\nAll channels land in the same unified inbox.",
+  },
+  {
+    patterns: ["voice", "phone", "call", "twilio", "ai voice", "phone call", "calling"],
+    response:
+      "OmniFlow's AI Voice channel uses Twilio to handle inbound phone calls automatically. When a customer calls your Twilio number:\n\n1. 🤖 The AI greets them and listens\n2. 🧠 The speech is transcribed in real time\n3. 📥 A new conversation appears in your inbox with the full transcript\n4. 💬 The AI responds using your knowledge base\n\nNo human needed for routine calls!",
+  },
+  {
+    patterns: ["webhook", "how does it receive", "how messages arrive", "how it works technically", "api"],
+    response:
+      "OmniFlow uses webhooks to receive messages from external platforms. When a customer sends a message on WhatsApp, Facebook, or Instagram, Meta sends an HTTP POST to your OmniFlow webhook URL. OmniFlow verifies the request, extracts the message, generates an AI reply, and sends it back — all in under a second.\n\nFor the website widget, messages are sent directly to the OmniFlow backend API.",
   },
   {
     patterns: ["rag", "knowledge base", "document", "upload", "faq", "pdf", "file", "train"],
@@ -84,6 +94,21 @@ const FAQ: { patterns: string[]; response: string }[] = [
     patterns: ["escalat", "human", "agent", "transfer", "handoff", "support team"],
     response:
       "When a conversation needs a human touch, OmniFlow can escalate it — either via a workflow rule or manually with one click from the inbox. Once escalated, AI replies pause and your team takes over.",
+  },
+  {
+    patterns: ["security", "data", "privacy", "safe", "gdpr", "store", "storage"],
+    response:
+      "OmniFlow takes data security seriously:\n\n• All conversations are stored in a private database\n• API keys and tokens are stored as environment variables — never in code\n• Webhook endpoints verify signatures before processing any message\n• You control what goes into your knowledge base — no data is shared with third parties",
+  },
+  {
+    patterns: ["team", "agent", "assign", "multiple user", "multi agent", "colleague", "staff"],
+    response:
+      "OmniFlow supports multi-agent teams! You can:\n\n• Assign any conversation to a specific team member from the inbox\n• See who's handling which conversation at a glance\n• Escalate conversations directly to a human agent\n• Create workflow rules that auto-assign based on keywords\n\nPerfect for support teams of any size.",
+  },
+  {
+    patterns: ["inbox", "unified inbox", "all in one", "single inbox", "manage conversation"],
+    response:
+      "The OmniFlow inbox is your command centre. All messages from every channel — website, WhatsApp, Facebook, Instagram, email, and phone — appear in one place.\n\n• 🔴 Filter by channel (website / WhatsApp / Facebook / etc.)\n• 🔴 Filter by status (active / escalated / booked / lead)\n• Real-time updates via SSE — new messages appear instantly\n• Click any conversation to see the full thread + AI replies",
   },
   {
     patterns: ["analytic", "report", "stat", "metric", "dashboard", "insight", "chart"],
@@ -115,7 +140,7 @@ function getOmniFlowResponse(input: string): string {
   for (const { patterns, response } of FAQ) {
     if (patterns.some((p) => lower.includes(p))) return response;
   }
-  return "That's a great question! I'm focused on answering questions about OmniFlow AI — features, pricing, channels, knowledge base, and more.\n\nCould you rephrase, or ask something like:\n• \"What features does OmniFlow have?\"\n• \"How much does it cost?\"\n• \"How does the knowledge base work?\"";
+  return "Great question! I'm your OmniFlow AI assistant — I can answer questions about our platform.\n\nTry asking me:\n• \"What channels does OmniFlow support?\"\n• \"How does the voice call feature work?\"\n• \"What is RAG / knowledge base?\"\n• \"How much does it cost?\"\n• \"How does escalation work?\"";
 }
 
 function formatTime(iso: string) {

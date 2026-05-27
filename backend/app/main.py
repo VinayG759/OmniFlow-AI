@@ -1240,8 +1240,10 @@ async def demo_inject(payload: DemoInject, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    history = [{"role": "user", "content": payload.message}]
-    ai_text = generate_ai_response(history, db)
+    context_chunks = retrieve_knowledge(payload.message, db)
+    ai_text, _ai_source = generate_ai_response(
+        payload.message, [], context_chunks
+    )
 
     ai_msg = MessageRow(
         id=str(uuid4()),
