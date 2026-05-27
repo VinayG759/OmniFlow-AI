@@ -70,6 +70,12 @@ fb_verify_token      = os.getenv("FB_VERIFY_TOKEN", "omniflow-fb-secret")
 ig_page_access_token = os.getenv("IG_PAGE_ACCESS_TOKEN", "")
 ig_verify_token      = os.getenv("IG_VERIFY_TOKEN", "omniflow-ig-secret")
 
+# ── Twilio Voice config ───────────────────────────────────────────────────────
+
+twilio_account_sid  = os.getenv("TWILIO_ACCOUNT_SID", "")
+twilio_auth_token   = os.getenv("TWILIO_AUTH_TOKEN", "")
+twilio_phone_number = os.getenv("TWILIO_PHONE_NUMBER", "")
+
 # ── Google Sheets config ──────────────────────────────────────────────────────
 
 gs_credentials_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
@@ -166,7 +172,7 @@ def sync_lead_to_sheets(lead_row) -> None:
 # ── Pydantic response schemas ─────────────────────────────────────────────────
 
 Sender             = Literal["user", "ai", "human"]
-Channel            = Literal["website", "whatsapp", "email", "facebook", "instagram"]
+Channel            = Literal["website", "whatsapp", "email", "facebook", "instagram", "phone"]
 ConversationStatus = Literal["active", "lead", "booked", "escalated"]
 
 
@@ -2059,3 +2065,179 @@ async def stream_messages(conv_id: str):
                 pass
 
     return StreamingResponse(event_gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+# ── Twilio AI Voice Call Automation ──────────────────────────────────────────
+
+def _twiml_gather(say_text: str, action: str = "/voice/transcribed") -> str:
+    """Build a TwiML <Gather> response that speaks text and listens for speech."""
+    safe = (
+        say_text
+        .replace("&", " and ")
+        .replace("<", " ")
+        .replace(">", " ")
+        .replace('"', "'")
+    )
+    # Clamp to ~350 chars so the TTS doesn't ramble
+    if len(safe) > 350:
+        safe = safe[:347] + "..."
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Response>"
+        f'<Gather input="speech" action="{action}" timeout="6" speechTimeout="auto" language="en-US">'
+        f'<Say voice="Polly.Joanna">{safe}</Say>'
+        "</Gather>"
+        "<Say voice=\"Polly.Joanna\">I didn't catch that. Thank you for calling OmniFlow AI. Goodbye!</Say>"
+        "</Response>"
+    )
+
+
+@app.post("/voice/incoming")
+async def voice_incoming(request: Request, db: Session = Depends(get_db)):
+    """Twilio webhook — fires when a call arrives on our number.
+
+    Creates a new phone conversation in the DB and returns a TwiML greeting
+    with a <Gather> that will collect the caller's speech.
+    """
+    form     = await request.form()
+    call_sid = str(form.get("CallSid", f"call_{uuid4().hex[:12]}"))
+    caller   = str(form.get("From", "Unknown"))
+
+    conv_id = f"call_{call_sid}"
+    if not db.query(ConversationRow).filter(ConversationRow.id == conv_id).first():
+        # Last 4 digits of caller's number as display name (privacy-friendly)
+        digits  = re.sub(r"\D", "", caller)
+        display = f"Caller …{digits[-4:]}" if len(digits) >= 4 else f"Caller ({caller})"
+        db.add(ConversationRow(
+            id=conv_id,
+            customer_name=display,
+            channel="phone",
+            status="active",
+            last_message="Incoming voice call",
+            updated_at=utc_now(),
+            unread_count=1,
+        ))
+        db.commit()
+        _broadcast_conv_update(row_to_conversation(
+            db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+        ))
+
+    twiml = _twiml_gather(
+        "Hi! You've reached OmniFlow AI. How can I help you today?",
+        action="/voice/transcribed",
+    )
+    return Response(content=twiml, media_type="text/xml")
+
+
+@app.post("/voice/transcribed")
+async def voice_transcribed(request: Request, db: Session = Depends(get_db)):
+    """Twilio webhook — fires after <Gather> transcribes the caller's speech.
+
+    Runs the transcript through the same RAG + AI pipeline used for text
+    channels, saves the exchange as messages, then returns a TwiML <Say>
+    with the AI reply followed by another <Gather> for multi-turn dialogue.
+    """
+    form          = await request.form()
+    call_sid      = str(form.get("CallSid", f"call_{uuid4().hex[:12]}"))
+    caller        = str(form.get("From", "Unknown"))
+    speech_result = str(form.get("SpeechResult", "")).strip()
+
+    if not speech_result:
+        return Response(
+            content=_twiml_gather("I'm sorry, I didn't hear you. Could you please repeat that?"),
+            media_type="text/xml",
+        )
+
+    conv_id = f"call_{call_sid}"
+
+    # Ensure conversation row exists
+    conv = db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+    if not conv:
+        digits  = re.sub(r"\D", "", caller)
+        display = f"Caller …{digits[-4:]}" if len(digits) >= 4 else f"Caller ({caller})"
+        conv = ConversationRow(
+            id=conv_id,
+            customer_name=display,
+            channel="phone",
+            status="active",
+            last_message=speech_result[:200],
+            updated_at=utc_now(),
+            unread_count=0,
+        )
+        db.add(conv)
+        db.commit()
+
+    # Snapshot history *before* saving the new user message
+    history = [
+        row_to_message(r)
+        for r in db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conv_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    ]
+
+    # Persist user's spoken message
+    db.add(MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="user",
+        body=speech_result,
+        created_at=utc_now(),
+    ))
+
+    # Generate AI reply through existing RAG pipeline
+    chunks    = retrieve_knowledge(speech_result, db)
+    slots     = get_available_slots(db)
+    ai_reply, _ = generate_ai_response(speech_result, history, chunks, slots)
+
+    # Persist AI reply
+    db.add(MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="ai",
+        body=ai_reply,
+        created_at=utc_now(),
+    ))
+
+    # Update conversation metadata
+    conv.last_message = ai_reply[:200]
+    conv.updated_at   = utc_now()
+    conv.unread_count = (conv.unread_count or 0) + 1
+
+    # Lead capture from voice transcript
+    lead = try_capture_lead(conv, speech_result, history, db)
+    if lead:
+        sync_lead_to_sheets(lead)
+
+    # Auto-escalation
+    if should_auto_escalate(speech_result, ai_reply):
+        conv.status = "escalated"
+
+    db.commit()
+
+    # SSE broadcast so the Inbox updates in real time
+    all_msgs = (
+        db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conv_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    )
+    _broadcast_conv_update(row_to_conversation(conv))
+    _broadcast_msg_update(conv_id, [row_to_message(r) for r in all_msgs])
+
+    # Speak AI reply + loop back for next turn
+    return Response(
+        content=_twiml_gather(ai_reply),
+        media_type="text/xml",
+    )
+
+
+@app.get("/debug/twilio")
+def debug_twilio():
+    """Check whether Twilio env vars are configured."""
+    return {
+        "twilio_configured": bool(twilio_account_sid and twilio_auth_token and twilio_phone_number),
+        "account_sid_set":   bool(twilio_account_sid),
+        "auth_token_set":    bool(twilio_auth_token),
+        "phone_number":      twilio_phone_number or "(not set)",
+    }
