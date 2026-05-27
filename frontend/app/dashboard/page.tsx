@@ -1183,22 +1183,24 @@ export default function DashboardPage() {
 
           <div className="flex-1 p-5">
 
-            {/* ── Metrics row (always visible) ── */}
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {metrics.map((metric) => (
-                <article
-                  key={metric.label}
-                  onClick={metric.action}
-                  className={`rounded-lg border border-neutral-200 bg-white p-5 ${
-                    metric.action ? "cursor-pointer transition hover:border-cyan-300 hover:shadow-sm" : ""
-                  }`}
-                >
-                  <p className="text-sm font-medium text-neutral-500">{metric.label}</p>
-                  <p className="mt-3 text-3xl font-semibold">{metric.value}</p>
-                  <p className="mt-2 text-sm text-neutral-500">{metric.detail}</p>
-                </article>
-              ))}
-            </div>
+            {/* ── Metrics row (hidden on Inbox) ── */}
+            {activeSection !== "Inbox" && (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {metrics.map((metric) => (
+                  <article
+                    key={metric.label}
+                    onClick={metric.action}
+                    className={`rounded-lg border border-neutral-200 bg-white p-5 ${
+                      metric.action ? "cursor-pointer transition hover:border-cyan-300 hover:shadow-sm" : ""
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-neutral-500">{metric.label}</p>
+                    <p className="mt-3 text-3xl font-semibold">{metric.value}</p>
+                    <p className="mt-2 text-sm text-neutral-500">{metric.detail}</p>
+                  </article>
+                ))}
+              </div>
+            )}
 
             {errorMessage ? (
               <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -1228,7 +1230,9 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="mt-1 text-sm text-neutral-500">
-                      All channels · website, WhatsApp, Facebook, Instagram.
+                      {channelFilter === "all"
+                        ? `${filteredConversations.length} conversation${filteredConversations.length !== 1 ? "s" : ""} · all channels`
+                        : `${filteredConversations.length} ${channelFilter} conversation${filteredConversations.length !== 1 ? "s" : ""}`}
                     </p>
                     {/* Channel filter */}
                     <select
@@ -1336,7 +1340,7 @@ export default function DashboardPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="mt-2 max-h-12 overflow-y-auto text-sm leading-5 text-neutral-500">
+                            <p className="mt-2 line-clamp-2 text-sm leading-5 text-neutral-500">
                               {conversation.last_message}
                             </p>
                           </div>
