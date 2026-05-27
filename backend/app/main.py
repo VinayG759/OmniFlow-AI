@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -1007,10 +1008,46 @@ def _seed_database(db: Session) -> None:
             db.commit()
 
 
+# ── SSE broadcast infrastructure ─────────────────────────────────────────────
+# Sync route handlers (which run in a threadpool) push updates to async SSE
+# clients by bridging through the event loop captured at startup.
+
+_sse_loop:        asyncio.AbstractEventLoop | None  = None
+_conv_sse_queues: list[asyncio.Queue]               = []          # one per SSE client
+_msg_sse_queues:  dict[str, list[asyncio.Queue]]    = {}          # conv_id → clients
+
+
+def _push_to_queue(q: asyncio.Queue, data: str) -> None:
+    """Thread-safe put onto an asyncio queue from a sync context."""
+    if _sse_loop is not None and not _sse_loop.is_closed():
+        asyncio.run_coroutine_threadsafe(q.put(data), _sse_loop)
+
+
+def _broadcast_conv_update(conv: "Conversation") -> None:
+    """Push a single-conversation update to every connected SSE client."""
+    if not _conv_sse_queues:
+        return
+    payload = json.dumps({"type": "update", "conversation": conv.model_dump(mode="json")})
+    for q in list(_conv_sse_queues):
+        _push_to_queue(q, payload)
+
+
+def _broadcast_msg_update(conv_id: str, messages: list["Message"]) -> None:
+    """Push a full message-thread update to every client watching conv_id."""
+    targets = _msg_sse_queues.get(conv_id)
+    if not targets:
+        return
+    payload = json.dumps({"type": "messages", "messages": [m.model_dump(mode="json") for m in messages]})
+    for q in list(targets):
+        _push_to_queue(q, payload)
+
+
 # ── FastAPI app + lifespan ────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
+    global _sse_loop
+    _sse_loop = asyncio.get_running_loop()
     # Create all tables (no-op if they already exist) then seed
     Base.metadata.create_all(bind=engine)
 
@@ -1716,7 +1753,14 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
         .order_by(MessageRow.created_at)
         .all()
     )
-    return [row_to_message(r) for r in rows]
+    result = [row_to_message(r) for r in rows]
+
+    # Push real-time updates to any connected SSE clients
+    db.refresh(conv_row)
+    _broadcast_conv_update(row_to_conversation(conv_row))
+    _broadcast_msg_update(payload.conversation_id, result)
+
+    return result
 
 
 # ── WhatsApp Webhooks ─────────────────────────────────────────────────────────
@@ -1949,3 +1993,69 @@ def send_message_stream(payload: MessageCreate, db: Session = Depends(get_db)):
             "X-Accel-Buffering": "no",   # disable nginx buffering
         },
     )
+
+
+# ── Real-time SSE streams ─────────────────────────────────────────────────────
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
+
+
+@app.get("/stream/conversations")
+async def stream_conversations():
+    """SSE stream that pushes conversation-list updates in real time.
+
+    Clients receive:
+      data: {"type": "ping"}                        — heartbeat every 30 s
+      data: {"type": "update", "conversation": {...}} — whenever a conversation changes
+    """
+    q: asyncio.Queue[str] = asyncio.Queue()
+    _conv_sse_queues.append(q)
+
+    async def event_gen():
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield f"data: {data}\n\n"
+                except asyncio.TimeoutError:
+                    yield 'data: {"type":"ping"}\n\n'
+        finally:
+            try:
+                _conv_sse_queues.remove(q)
+            except ValueError:
+                pass
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@app.get("/stream/messages/{conv_id}")
+async def stream_messages(conv_id: str):
+    """SSE stream that pushes message-thread updates for a single conversation.
+
+    Clients receive:
+      data: {"type": "ping"}                          — heartbeat every 30 s
+      data: {"type": "messages", "messages": [...]}   — full thread on new message
+    """
+    q: asyncio.Queue[str] = asyncio.Queue()
+    _msg_sse_queues.setdefault(conv_id, []).append(q)
+
+    async def event_gen():
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield f"data: {data}\n\n"
+                except asyncio.TimeoutError:
+                    yield 'data: {"type":"ping"}\n\n'
+        finally:
+            bucket = _msg_sse_queues.get(conv_id, [])
+            try:
+                bucket.remove(q)
+            except ValueError:
+                pass
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
