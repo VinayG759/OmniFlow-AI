@@ -1295,7 +1295,7 @@ export default function DashboardPage() {
                     )}
 
                     {filteredConversations.map((conversation) => {
-                      const meta = channelMeta[conversation.channel];
+                      const meta = channelMeta[conversation.channel] ?? channelMeta.website;
                       const ChannelIcon = meta.icon;
                       const isSelected = conversation.id === selectedConversationId;
 
@@ -1393,7 +1393,7 @@ export default function DashboardPage() {
                             {selectedConversation.customer_name}
                           </h2>
                           <p className="mt-1 text-sm text-neutral-500">
-                            {channelMeta[selectedConversation.channel].label} thread ·{" "}
+                            {channelMeta[selectedConversation.channel]?.label ?? selectedConversation.channel} thread ·{" "}
                             updated {formatDateTime(selectedConversation.updated_at)}
                           </p>
                         </div>
