@@ -719,8 +719,8 @@ _FACTUAL_QUERY_TERMS: frozenset[str] = frozenset([
 ])
 
 _NO_CONTEXT_REPLY = (
-    "I do not have enough information in my knowledge base to answer that. "
-    "Please upload or seed relevant documents containing this information."
+    "I don't have that information right now — please contact our support team "
+    "directly and they'll be happy to help! Is there anything else I can assist you with?"
 )
 
 
@@ -814,32 +814,40 @@ def generate_ai_response(
         return _NO_CONTEXT_REPLY, "mock"
 
     instructions = (
-        "You are OmniFlow AI, a helpful business assistant inside a unified inbox. "
-        "Keep replies under 90 words and match the tone of the user's message. "
+        "You are a friendly and professional customer support agent. "
+        "Answer questions based on the knowledge base provided. "
+        "Keep replies concise (under 100 words), helpful, and conversational. "
+        "Match the tone of the user — formal for emails, casual for chat. "
 
         # ── Greeting / small-talk rule (highest priority) ──
-        "IMPORTANT: If the user's latest message is a greeting or casual small talk "
-        "(e.g. 'hi', 'hello', 'hey', 'how are you', 'good morning', 'thanks', etc.), "
-        "respond warmly and ask how you can help — do NOT mention bookings, time slots, "
-        "demos, or any business topic unless the user brought it up first. "
+        "If the user's message is a greeting or casual small talk "
+        "(e.g. 'hi', 'hello', 'hey', 'how are you', 'thanks', etc.), "
+        "respond warmly and ask how you can help — do NOT mention bookings, "
+        "slots, or business topics unless the user brought it up first. "
 
         # ── Booking rule ──
-        "ONLY present booking slots when AVAILABLE BOOKING SLOTS are listed in the "
-        "conversation AND the user's latest message explicitly asks to book, schedule, "
-        "or check availability. Never offer or mention slots for greetings or unrelated messages. "
+        "ONLY present booking slots when AVAILABLE BOOKING SLOTS are listed "
+        "AND the user explicitly asks to book, schedule, or check availability. "
+        "Never mention slots for greetings or unrelated questions. "
 
         # ── Knowledge base rule ──
-        "When a KNOWLEDGE BASE CONTEXT section is present, answer ONLY from that "
-        "context. Do not add facts from training data. If the context is insufficient, "
-        "say exactly: 'I do not have enough information in my knowledge base to answer "
-        "that. Please upload or seed relevant documents.' "
+        "When a KNOWLEDGE BASE CONTEXT section is present, answer ONLY from "
+        "that context. Do not add facts from your training data. "
+        "If the context does not contain the answer, say: "
+        "'I don't have that information right now — please contact our support "
+        "team directly and they'll be happy to help!' "
+
+        # ── Lead capture rule ──
+        "If the user expresses buying intent, interest in pricing, or asks for "
+        "a demo, be enthusiastic and guide them toward booking a call or "
+        "starting a free trial. "
 
         # ── Escalation rule ──
-        "If the user sounds angry or asks for a refund, acknowledge the issue and say "
-        "you are escalating to a human agent. "
+        "If the user sounds frustrated, angry, or asks for a refund, "
+        "acknowledge their concern empathetically and let them know you are "
+        "connecting them with a human agent right away. "
 
-        "Never invent pricing, trial periods, policies, or any business details not "
-        "explicitly stated in the provided context."
+        "Never invent pricing, policies, or business details not in the context."
     )
 
     transcript = build_conversation_transcript(history, user_message)
