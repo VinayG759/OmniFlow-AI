@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 import re
@@ -13,7 +15,8 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
+from sqlalchemy import text as sa_text
 from groq import Groq
 from openai import OpenAI
 from pypdf import PdfReader
@@ -174,6 +177,7 @@ class Conversation(BaseModel):
     last_message: str
     updated_at: str
     unread_count: int = 0
+    assigned_to: str | None = None
 
 
 class Message(BaseModel):
@@ -295,6 +299,7 @@ def row_to_conversation(r: ConversationRow) -> Conversation:
         id=r.id, customer_name=r.customer_name, channel=r.channel,
         status=r.status, last_message=r.last_message or "",
         updated_at=r.updated_at, unread_count=r.unread_count or 0,
+        assigned_to=r.assigned_to or None,
     )
 
 def row_to_message(r: MessageRow) -> Message:
@@ -1008,6 +1013,17 @@ def _seed_database(db: Session) -> None:
 async def lifespan(app: FastAPI):  # noqa: ARG001
     # Create all tables (no-op if they already exist) then seed
     Base.metadata.create_all(bind=engine)
+
+    # Incremental schema migrations (safe to re-run; IF NOT EXISTS guards each)
+    with engine.connect() as conn:
+        try:
+            conn.execute(sa_text(
+                "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_to VARCHAR"
+            ))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
     db: Session = SessionLocal()
     try:
         _seed_database(db)
@@ -1471,6 +1487,78 @@ def update_conversation_status(
     conv.updated_at = utc_now()
     db.commit()
     return row_to_conversation(conv)
+
+
+_AGENT_ROSTER = ["Priya", "Support Team", "Sales Team", "Unassigned"]
+
+
+class AssignPayload(BaseModel):
+    agent: str = Field(..., min_length=1, max_length=80)
+
+
+@app.patch("/conversations/{conversation_id}/assign", response_model=Conversation)
+def assign_conversation(
+    conversation_id: str, payload: AssignPayload, db: Session = Depends(get_db)
+) -> Conversation:
+    """Assign a conversation to a human agent (or 'Unassigned')."""
+    conv = db.query(ConversationRow).filter(ConversationRow.id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    conv.assigned_to = None if payload.agent == "Unassigned" else payload.agent
+    conv.updated_at = utc_now()
+    db.commit()
+    return row_to_conversation(conv)
+
+
+@app.get("/agents")
+def list_agents() -> dict:
+    """Return the hardcoded agent roster."""
+    return {"agents": _AGENT_ROSTER}
+
+
+@app.get("/leads/export")
+def export_leads_csv(db: Session = Depends(get_db)) -> Response:
+    """Download all leads as a CSV file."""
+    rows = db.query(LeadRow).order_by(LeadRow.created_at.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "Email", "Phone", "Interest", "Channel", "Captured At"])
+    for r in rows:
+        writer.writerow([
+            r.customer_name or "",
+            r.email or "",
+            r.phone or "",
+            r.interest or "",
+            r.channel or "",
+            r.created_at or "",
+        ])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=omniflow-leads.csv"},
+    )
+
+
+@app.get("/bookings/export")
+def export_bookings_csv(db: Session = Depends(get_db)) -> Response:
+    """Download all bookings as a CSV file."""
+    rows = db.query(BookingRow).order_by(BookingRow.created_at.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "Email", "Slot", "Channel", "Booked At"])
+    for r in rows:
+        writer.writerow([
+            r.customer_name or "",
+            r.email or "",
+            r.slot or "",
+            r.channel or "",
+            r.created_at or "",
+        ])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=omniflow-bookings.csv"},
+    )
 
 
 @app.post("/messages", response_model=list[Message])

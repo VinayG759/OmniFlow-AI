@@ -42,6 +42,7 @@ class ConversationRow(Base):
     last_message  = Column(String, default="")
     updated_at    = Column(String, nullable=False)
     unread_count  = Column(Integer, default=0)
+    assigned_to   = Column(String, nullable=True, default=None)
 
 
 class MessageRow(Base):

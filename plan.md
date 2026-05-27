@@ -1,1259 +1,375 @@
-# 3 Day Hackathon Execution Plan
-## Multi-Channel Auto Reply, Calls & Business Automation Platform
+# OmniFlow AI — Implementation Plan
+**Hackathon: SummerShip Challenge 2026 · Problem #05**
+**Multi Channel Auto Reply, Calls & Business Automation Platform**
 
 ---
 
-# 1. Goal of the 3-Day Build
+## Gap Summary
 
-You do NOT have time to build:
-- Full SaaS
-- Complete CRM
-- Production-grade voice AI
-- Full LinkedIn automation
-- Enterprise workflow systems
-- Production authentication and billing
-
-Your objective is to build a:
-
-# Convincing MVP Prototype
-
-The MVP should demonstrate:
-
-- Unified Inbox
-- AI Auto Reply
-- WhatsApp-like Chat Simulation
-- Website Chat Widget
-- Knowledge Base + RAG
-- Lead Capture
-- Appointment Booking
-- Human Escalation
-- Dashboard Analytics
-- Workflow Automation Demo
-
-This is enough to:
-- Win hackathons
-- Impress judges
-- Show system design skills
-- Demonstrate AI engineering
-- Demonstrate real-world business value
-
----
-
-# 2. Strategic Scope Reduction
-
-## Do Not Build
-
-- Real LinkedIn messaging
-- Real Instagram DM automation
-- Real Facebook inbox
-- Real Twilio voice AI
-- Complex OAuth systems
-- Full workflow engine
-- Multi-tenancy
-- Kubernetes
-- Microservices
-- Billing or subscriptions
-
-These consume too much time and do not improve the hackathon demo enough.
-
-## Build Instead
-
-Focus on one polished business automation flow:
-
-```text
-Website Chat
-+ AI RAG Answer
-+ Lead Capture
-+ Appointment Booking
-+ Unified Inbox
-+ Workflow Trigger
-+ Human Escalation
-+ Analytics
-```
-
----
-
-# 3. Final MVP Architecture
-
-```text
-Frontend (Next.js)
-    |
-    v
-FastAPI Backend
-    |
-    +--> Chat + Conversations API
-    |
-    +--> RAG Engine
-    |       |
-    |       v
-    |    ChromaDB
-    |
-    +--> Workflow Logic
-    |
-    +--> Analytics + Demo Data
-    |
-    v
-OpenAI/Gemini API
-```
-
-## Realtime Strategy
-
-Use the simplest approach that works:
-
-- Preferred for speed: frontend optimistic updates + backend persistence
-- Optional if time remains: WebSockets or Socket.IO
-- Acceptable for demo: polling every few seconds
-
----
-
-# 4. Final Feature Set
-
-# Must-Have Features
-
-## 1. Website Chat Widget
-- Live chat UI
-- AI responses
-- Typing indicator
-- Lead capture prompts
-
-## 2. Unified Inbox Dashboard
-- Multiple conversations
-- Message history
-- AI/Human labels
-- Conversation status: active, lead captured, escalated, booked
-
-## 3. Knowledge Base RAG
-
-Upload or seed:
-- FAQs
-- TXT docs
-- PDFs if time allows
-
-AI answers based on company data.
-
-Recommended priority:
-1. Seeded FAQ/text knowledge base
-2. TXT upload
-3. PDF upload
-
-## 4. Lead Capture
-
-AI asks for:
-- Name
-- Email
-- Phone
-- Interest
-
-Stores lead data.
-
-## 5. Appointment Booking
-
-Mock booking system:
-- Available slots
-- Date
-- Time
-- Confirmation
-- Slot becomes unavailable after booking
-
-## 6. Workflow Automation
-
-Simple rule-based demo:
-
-```text
-IF pricing query
--> Send pricing response
--> Mark as sales opportunity
-```
-
-```text
-IF refund or angry query
--> Escalate to human
-```
-
-## 7. Analytics Dashboard
-
-Show:
-- Total chats
-- Leads captured
-- AI response count
-- Bookings
-- Escalations
-- Daily conversations chart
-
-## 8. Human Escalation
-
-```text
-Transfer to Human
-```
-
-Show escalation state in the inbox.
-
----
-
-# Optional Bonus Features
-
-Only add these after the core demo works:
-
-- WhatsApp webhook demo
-- Voice assistant demo
-- Google Sheets export
-- Sentiment analysis
-- Email notifications
-- PDF upload if not already completed
-- WebSocket realtime updates
-
----
-
-# 5. Recommended Tech Stack
-
-## Frontend
-
-| Area | Tech |
+| Feature | Status |
 |---|---|
-| Framework | Next.js 15 |
-| Styling | TailwindCSS |
-| Components | shadcn/ui |
-| State | Zustand or React state |
-| Charts | Recharts |
-| Realtime | Polling first, Socket.IO optional |
-
-## Backend
-
-| Area | Tech |
-|---|---|
-| API | FastAPI |
-| AI | Direct SDK calls or LangChain |
-| Vector DB | ChromaDB |
-| DB | SQLite for hackathon speed |
-| Realtime | Polling or WebSockets |
-| Background Tasks | FastAPI BackgroundTasks |
-
-## AI
-
-| Area | Tech |
-|---|---|
-| LLM | Gemini API or OpenAI |
-| Embeddings | Gemini/OpenAI |
-| RAG | Simple retriever first, LangChain optional |
-| Chunking | Recursive splitter |
-
-## Recommendation
-
-For a 3-day hackathon, prefer:
-
-```text
-SQLite + ChromaDB + FastAPI + Next.js
-```
-
-Avoid PostgreSQL unless the project already has it configured.
+| WhatsApp Automation | ✅ Done |
+| Facebook Inbox Automation | ✅ Done |
+| Website Chat Widget | ✅ Done |
+| Unified Inbox | ✅ Done |
+| AI Response Engine (RAG / Groq) | ✅ Done |
+| Knowledge Base Training | ✅ Done |
+| Lead Capture | ✅ Done |
+| Booking Management | ✅ Done |
+| Customer Data Collection | ✅ Done |
+| Google Sheets Export | ✅ Done |
+| Workflow Automation | ✅ Done |
+| Analytics Dashboard | ✅ Done |
+| **Instagram Auto Reply** | ❌ Missing |
+| **AI Voice Call Automation** | ❌ Missing |
+| **LinkedIn Messaging** | ❌ Missing |
+| **Notifications** | ❌ Missing |
+| **Team Assignment** | ❌ Missing |
+| **CSV Export / CRM Integration** | ❌ Missing |
+| **Real-time WebSocket Inbox** | ⚠️ Polling only |
 
 ---
 
-# 6. Folder Structure
+## Phase 1 — Quick Wins
+**Estimated Time: 1–2 hours | Impact: High | Effort: Low**
+> These require no new APIs, no new dependencies — just wiring up existing data.
 
-## Frontend
+### 1.1 CSV Export (Leads + Bookings)
+**Files:** `frontend/app/dashboard/page.tsx`, `backend/app/main.py`
 
-```text
-frontend/
-+-- app/
-+-- components/
-|   +-- chat/
-|   +-- dashboard/
-|   +-- analytics/
-|   +-- ui/
-+-- store/
-+-- hooks/
-+-- services/
-+-- lib/
+**Backend — New Endpoints:**
 ```
-
-## Backend
-
-```text
-backend/
-+-- app/
-|   +-- api/
-|   +-- ai/
-|   +-- rag/
-|   +-- workflows/
-|   +-- services/
-|   +-- models/
-|   +-- db/
-|   +-- utils/
+GET /leads/export     → returns CSV file (text/csv)
+GET /bookings/export  → returns CSV file (text/csv)
 ```
+- Use Python's `csv` module + `StreamingResponse` with `text/csv` content-type
+- Leads CSV headers: Name, Email, Phone, Interest, Channel, Captured At
+- Bookings CSV headers: Name, Email, Slot, Channel, Booked At
+
+**Frontend — UI Changes:**
+- Add "Export CSV" button in the **Leads** tab toolbar (top-right)
+- Add "Export CSV" button in the **Bookings** tab toolbar
+- On click: `window.open(API_BASE + "/leads/export")` — triggers browser download
+- No state changes needed
 
 ---
 
-# 7. 3-Day Timeline
+### 1.2 In-App Notifications
+**Files:** `frontend/app/dashboard/page.tsx`
 
-# Day 1 - Core Chat + App Shell
+**What to notify:**
+- 🔴 New **escalation** — conversation status flipped to `escalated`
+- 🟢 New **lead** captured — conversation status flipped to `lead`
+- 📅 New **booking** confirmed — conversation status flipped to `booked`
 
-## Phase 1 - Project Setup (1 Hour)
+**Implementation (frontend-only, no backend changes):**
+- Add `notifications: Notification[]` state in dashboard
+- During each polling cycle (`fetchConversations` every 8s), diff previous vs new conversations
+- If a conversation status changes → push a notification object `{ id, message, time, read }`
+- Add a **bell icon** (🔔) in the dashboard top nav bar
+- Show unread badge count (red dot) on bell
+- On bell click → dropdown panel listing last 10 notifications with timestamp + "Mark all read" button
+- Auto-mark read after 5 seconds if panel is open
 
-### Tasks
-- Setup frontend
-- Setup backend
-- Configure Tailwind
-- Setup FastAPI
-- Setup CORS
-- Create environment configs
-- Add health route
-
-### Deliverables
-
-#### Frontend Running
-```bash
-npm run dev
-```
-
-#### Backend Running
-```bash
-uvicorn app.main:app --reload
-```
-
-### Review Checklist
-
-#### Frontend
-- [ ] Tailwind working
-- [ ] Routing working
-- [ ] Components rendering
-
-#### Backend
-- [ ] API working
-- [ ] Health route working
-- [ ] CORS working
-
-### Testing
-
-#### Backend Test
-```bash
-GET /health
-```
-
-Expected:
-
-```json
-{
-  "status": "ok"
-}
-```
+**No backend changes needed** — all status data already exists in `/conversations`.
 
 ---
 
-## Phase 2 - Mock Auth + Dashboard Layout (1.5 Hours)
+### 1.3 Team Assignment
+**Files:** `backend/app/database.py`, `backend/app/main.py`, `frontend/app/dashboard/page.tsx`
 
-### Build
-- Login page
-- Dashboard layout
-- Sidebar
-- Header
-- Mock authenticated state
+**Backend Changes:**
+- Add `assigned_to: str | None` column to `ConversationRow` (SQLAlchemy `Column(String, nullable=True)`)
+- Add to `Conversation` Pydantic model: `assigned_to: str | None = None`
+- Update `row_to_conversation()` converter to include `assigned_to`
+- New endpoint: `PATCH /conversations/{id}/assign` body `{ "agent": "Priya" }`
+- Hardcode agent roster: `["Priya", "Support Team", "Sales Team", "Unassigned"]`
 
-No real auth needed.
-
-### Review Checklist
-- [ ] Login screen routes to dashboard
-- [ ] Sidebar navigation works
-- [ ] Dashboard layout is responsive
-- [ ] Dark mode optional
-
----
-
-## Phase 3 - Unified Inbox UI (3 Hours)
-
-### Build
-- Conversation list
-- Chat window
-- Message bubbles
-- Typing indicator
-- AI/Human badges
-- Conversation status labels
-
-### Backend
-Create:
-
-```text
-GET /conversations
-GET /messages/{conversation_id}
-POST /messages
-```
-
-### Review Checklist
-- [ ] Multiple chats visible
-- [ ] Messages persist
-- [ ] Sending message updates UI
-- [ ] AI/Human labels visible
-
-### Testing
-- Send message
-- Receive mock AI response
-- Refresh and confirm persistence
+**Frontend — Inbox UI:**
+- In conversation detail panel: add "Assigned to" dropdown (agent roster list)
+- Show assigned agent name as a small badge below the conversation name in the left list
+- On dropdown change: call `PATCH /conversations/{id}/assign`
+- Default: "Unassigned" for all conversations
 
 ---
 
-## Phase 4 - AI Chat Integration (3 Hours)
+## Phase 2 — Channel Expansion
+**Estimated Time: 2–3 hours | Impact: High | Effort: Medium**
 
-### Build
-Integrate:
-- Gemini API or OpenAI
+### 2.1 Instagram Auto Reply
+**Files:** `backend/app/main.py`, `frontend/app/dashboard/page.tsx`
 
-### AI Flow
+**Context:** `send_instagram_reply()` already exists in backend. Instagram uses the **same Meta webhook payload format** as Facebook. The only blocker is Meta requiring an Instagram Business Account with app review approval.
 
-```text
-User Message
-    |
-    v
-Prompt Builder
-    |
-    v
-LLM
-    |
-    v
-AI Response
-```
+**Backend:**
+- Add `GET /webhook/instagram` — verify token handshake (same pattern as `/webhook/facebook`)
+- Add `POST /webhook/instagram` — handle incoming DMs:
+  - Parse `entry[].messaging[]` from payload (identical to FB format)
+  - Detect sender PSID, message text
+  - Run through existing AI pipeline (`generate_ai_response`)
+  - Save conversation with `channel="instagram"`
+  - Call `send_instagram_reply(sender_id, reply)`
+- Env vars required: `IG_PAGE_ACCESS_TOKEN`, `IG_VERIFY_TOKEN`
+- Register webhook on Meta for Apps → Instagram → subscribe to `messages` field
 
-### Add
-- Conversation history
-- Basic context memory
-- Fallback error response
+**Frontend:**
+- `instagram` already in `Channel` Literal type
+- Add Instagram channel icon (Camera icon) and pink/purple badge color in inbox list
+- Add `instagram` to channel filter dropdown in Inbox tab
 
-### Review Checklist
-- [ ] AI responds correctly
-- [ ] Context retained
-- [ ] Errors handled gracefully
-
-### Testing
-
-```text
-Hello
-What services do you offer?
-What was my previous question?
-```
+**Disclaimer for Judges:** Meta requires Business Verification (7–14 day process) to receive live IG DMs. The full backend pipeline is implemented — demo via `curl POST /webhook/instagram` with a mock payload works end-to-end.
 
 ---
 
-# End of Day 1 Target
+### 2.2 Real-Time Inbox via Server-Sent Events (SSE)
+**Files:** `backend/app/main.py`, `frontend/app/dashboard/page.tsx`
 
-You should have:
+**Why:** Problem statement explicitly lists "Unified Inbox WebSockets" as a key technology. Currently using `setInterval` polling (8s delay).
 
-- Functional dashboard
-- Unified inbox
-- Working chat UI
-- AI responses
-- Message persistence
-- Demo-ready app shell
-
----
-
-# Day 2 - RAG + Business Flows
-
-## Phase 5 - Knowledge Base RAG (4 Hours)
-
-### Build
-
-Start with:
-- Seeded FAQ/company text
-- TXT upload
-
-Add if time allows:
-- PDF upload
-
-### Pipeline
-
-```text
-Document
-   |
-   v
-Chunking
-   |
-   v
-Embeddings
-   |
-   v
-ChromaDB
-   |
-   v
-Retriever
-```
-
-### AI Flow
-
-```text
-Question
-   |
-   v
-Retrieve Chunks
-   |
-   v
-Add Context
-   |
-   v
-Generate Answer
-```
-
-### Review Checklist
-- [ ] Knowledge base can be seeded or uploaded
-- [ ] Retrieval works
-- [ ] AI answers from company data
-- [ ] AI says it does not know when context is missing
-
-### Testing
-
-```text
-What pricing plans are available?
-What are your business hours?
-```
-
-Ensure:
-- AI uses uploaded or seeded docs
-- AI avoids hallucinations
-
----
-
-## Phase 6 - Lead Capture System (2.5 Hours)
-
-### Build
-AI extracts:
-- Name
-- Email
-- Phone
-- Interest
-
-Store in DB.
-
-### Example
-
-```text
-User: I want a demo.
-AI: Sure, may I know your name and email?
-```
-
-### Review Checklist
-- [ ] Lead stored
-- [ ] Lead appears in dashboard
-- [ ] Validation working
-- [ ] Duplicate handling is basic but safe
-
----
-
-## Phase 7 - Appointment Booking (2.5 Hours)
-
-### Build
-Simple booking logic:
-- Available slots
-- Confirmation
-- Calendar storage
-- Slot unavailable after booking
-
-### Example
-
-```text
-AI:
-Available times:
-- 11 AM
-- 2 PM
-```
-
-### Review Checklist
-- [ ] Booking saved
-- [ ] Bookings visible in dashboard
-- [ ] Slot unavailable after booking
-- [ ] Confirmation message appears in chat
-
----
-
-## Phase 8 - Human Escalation (1 Hour)
-
-### Build
-- Manual "Transfer to Human" button
-- Automatic escalation for urgent/refund/angry messages
-- Escalated status in inbox
-
-### Review Checklist
-- [ ] Manual escalation works
-- [ ] Rule-based escalation works
-- [ ] Inbox clearly shows escalation state
-
----
-
-# End of Day 2 Target
-
-You should have:
-
-- RAG-powered AI answers
-- Lead capture
-- Appointment booking
-- Escalation flow
-- Strong end-to-end business demo
-
----
-
-# Day 3 - Automation + Analytics + Polish
-
-## Phase 9 - Workflow Automation (3 Hours)
-
-### Build
-Simple rules engine.
-
-### Rules Example
-
-```text
-IF contains "pricing"
--> Send pricing response
--> Mark as sales opportunity
-```
-
-```text
-IF contains "refund"
--> Escalate to human
-```
-
-```text
-IF contains "demo"
--> Start lead capture
-```
-
-### Architecture
-
-```text
-Trigger
-   |
-   v
-Condition
-   |
-   v
-Action
-```
-
-### Review Checklist
-- [ ] Rules execute
-- [ ] Escalation works
-- [ ] Lead capture trigger works
-- [ ] Workflow activity appears in UI
-
----
-
-## Phase 10 - Analytics Dashboard (2.5 Hours)
-
-### Build Cards
-- Total chats
-- AI replies
-- Leads
-- Bookings
-- Escalations
-
-### Add Charts
-- Daily conversations
-- Lead growth
-
-### Review Checklist
-- [ ] Cards render
-- [ ] Charts render
-- [ ] Counts are accurate enough for demo
-- [ ] Demo data looks realistic
-
----
-
-## Phase 11 - WhatsApp-like Simulation (1.5 Hours)
-
-### Build
-- Channel label: Website, WhatsApp, Email
-- Mock WhatsApp conversation
-- Same backend conversation model
-
-### Review Checklist
-- [ ] Channel labels visible
-- [ ] WhatsApp demo feels believable
-- [ ] No real webhook required
-
----
-
-## Phase 12 - Final Polish and Demo Prep (3 Hours)
-
-### Add
-- Loading states
-- Toast notifications
-- Empty states
-- Error states
-- Smooth but simple animations
-- Seed demo data
-- Clean final UI spacing
-
-### Demo Data
-Populate:
-- Conversations
-- Leads
-- Bookings
-- Workflow events
-- Escalations
-
-### Final Demo Script
-Prepare a repeatable script:
-1. Show dashboard overview.
-2. Open website chat.
-3. Ask a knowledge-base question.
-4. Ask for a demo.
-5. Capture lead details.
-6. Book appointment.
-7. Show unified inbox.
-8. Trigger refund escalation.
-9. Show analytics updates.
-
----
-
-# End of Day 3 Target
-
-You should have:
-
-- Polished demo flow
-- Clean dashboard
-- RAG working
-- Lead and booking flows working
-- Workflow automation demo
-- Analytics dashboard
-- Human escalation
-- Optional channel simulation
-
----
-
-# 8. Final Demo Flow
-
-## Step 1
-Upload or select company knowledge base.
-
-## Step 2
-Open website chat.
-
-## Step 3
-
-```text
-What pricing plans do you offer?
-```
-
-AI answers from KB.
-
-## Step 4
-
-```text
-I want a demo.
-```
-
-AI captures lead.
-
-## Step 5
-Book appointment.
-
-## Step 6
-Show unified inbox.
-
-## Step 7
-Show analytics dashboard.
-
-## Step 8
-
-```text
-I want a refund immediately.
-```
-
-AI escalates to human.
-
----
-
-# 9. Database Tables
-
-```text
-users
-conversations
-messages
-documents
-leads
-appointments
-workflow_events
-analytics
-```
-
-## Minimum SQLite Tables
-
-If time is tight, only create:
-
-```text
-conversations
-messages
-documents
-leads
-appointments
-workflow_events
-```
-
-Analytics can be calculated from these tables.
-
----
-
-# 10. APIs to Build
-
-```text
-GET  /health
-POST /chat
-POST /upload
-GET  /conversations
-GET  /messages/{conversation_id}
-POST /messages
-POST /lead
-GET  /leads
-POST /appointment
-GET  /appointments
-POST /escalate
-GET  /analytics
-GET  /workflow-events
-```
-
----
-
-# 11. High Priority UI Components
-
-```text
-Sidebar
-ChatWindow
-ConversationList
-MessageBubble
-TypingIndicator
-AnalyticsCards
-LeadTable
-BookingTable
-UploadPanel
-WorkflowEventList
-EscalationBadge
-ChannelBadge
-```
-
----
-
-# 12. Biggest Risk Areas
-
-## 1. RAG Bugs
-
-Fix:
-- Start with seeded text before PDF upload
-- Use small chunks
-- Keep prompts simple
-- Show fallback answer when context is missing
-
-Prompt:
-
-```text
-Answer only from the provided context. If the answer is not in the context, say you do not have enough information.
-```
-
-## 2. WebSocket Failures
-
-Fix:
-- Use polling or optimistic UI first
-- Add WebSockets only if core demo is already stable
-
-## 3. AI Hallucinations
-
-Fix:
-- Force KB-only answers for company-specific questions
-- Separate general chat from KB-grounded answers
-- Display source snippets if possible
-
-## 4. Too Many Features
-
-Fix:
-- Preserve the main demo path first
-- Mock integrations instead of building real channels
-- Cut optional features early if needed
-
----
-
-# 13. Hackathon Winning Strategy
-
-Judges care about:
-- Working demo
-- Real business value
-- AI integration
-- Smooth UX
-- Real-world applicability
-- Clear story
-
-Judges do NOT care much about:
-- Perfect backend architecture
-- Enterprise scalability
-- Real social platform integrations
-- Production authentication
-
----
-
-# 14. Final Success Criteria
-
-## Minimum Success
-
-- AI chat works
-- KB/RAG answers work
-- Inbox works
-- Lead capture works
-- Dashboard works
-
-## Strong Submission
-
-- Workflow automation
-- Appointment booking
-- Real-time or simulated real-time messaging
-- Human escalation
-- Clean UI
-- Good demo data
-
-## Exceptional Submission
-
-- WhatsApp simulation or webhook demo
-- Voice AI demo
-- Google Sheets export
-- CRM sync
-- Source citations for RAG answers
-
----
-
-# 15. Final Recommendation
-
-Your best strategy is:
-
-# Build depth, not breadth.
-
-Meaning:
-- Few channels
-- Polished experience
-- One complete business workflow
-
-instead of:
-- 10 broken integrations
-- Half-working automation
-- Complex architecture with no demo story
-
-The strongest 3-day demo is:
-
-```text
-Website Chat
-+ Unified Inbox
-+ AI RAG
-+ Lead Capture
-+ Booking
-+ Workflow Automation
-+ Analytics
-+ Human Escalation
-```
-
-That is enough to look like a real AI SaaS platform while staying achievable in 3 days.
-
----
-
-# Day 4–5 — Polish, Real Integrations & Business Pitch Ready
-
----
-
-## Phase 13 — Streaming AI Responses (2 Hours)
-
-### Goal
-Instead of waiting for the full AI reply, tokens stream word-by-word like ChatGPT. Biggest single "wow" factor in a live demo.
-
-### Backend Changes
-- Switch Groq/OpenAI calls to streaming mode (`stream=True`)
-- Add `GET /messages/stream/{conversation_id}` endpoint using FastAPI `StreamingResponse`
-- Emit Server-Sent Events (SSE) — one token per event, `data: <token>\n\n`
-
-### Frontend Changes
-- Replace `sendMessage` with a streaming fetch using `EventSource` or `ReadableStream`
-- Append tokens to a live message bubble as they arrive
-- Show blinking cursor `▌` at the end while streaming
-- Replace static "AI is typing…" spinner with the live streaming bubble
-
-### Architecture
-```text
-User sends message
-       |
-       v
-POST /messages  (saves user msg, triggers AI)
-       |
-       v
-GET /messages/stream/{conv_id}  (SSE stream)
-       |
-       v
-Frontend appends tokens in real-time
-       |
-       v
-Stream ends → bubble finalised → saved to DB
-```
-
-### Review Checklist
-- [ ] Tokens appear word by word
-- [ ] Blinking cursor visible while streaming
-- [ ] Full message saved to DB after stream ends
-- [ ] Falls back gracefully if streaming fails
-
----
-
-## Phase 14 — Analytics Charts (2.5 Hours)
-
-### Goal
-Replace the static number cards with real visual charts using Recharts. Turns the Analytics tab from "data dump" to "executive dashboard".
-
-### Install
-```bash
-npm install recharts
-```
-
-### Charts to Build
-
-| Chart | Type | Data Source |
-|---|---|---|
-| Daily Conversations (last 7 days) | Area chart | `GET /analytics` daily_counts |
-| Messages by Channel | Pie / Donut chart | Count conversations by channel |
-| Lead Growth (last 7 days) | Bar chart | Leads created per day |
-| Conversation Status Breakdown | Horizontal bar | active / lead / booked / escalated counts |
-
-### Frontend Changes
-- Import `AreaChart`, `BarChart`, `PieChart` from `recharts`
-- Use cyan/emerald color palette to match existing theme
-- Add `ResponsiveContainer` so charts resize properly
-- Show tooltips on hover with exact numbers
-- Keep existing stat cards above the charts
-
-### Review Checklist
-- [ ] All 4 charts render with real data
-- [ ] Charts are responsive (resize on window change)
-- [ ] Tooltips show on hover
-- [ ] Colors match app theme
-- [ ] No chart breaks when data is empty
-
----
-
-## Phase 15 — Conversation Status Control + Escalate to Human (2 Hours)
-
-### Goal
-Let agents manually change conversation status from the inbox. Close the full workflow loop — AI sets status automatically, human can override.
-
-### Status Options
-```text
-active  →  lead  →  booked  →  escalated  →  resolved
-```
-
-### Backend Changes
-- Add `PATCH /conversations/{id}/status` endpoint
-  - Accepts `{ "status": "escalated" }` (or any valid status)
-  - Updates DB, returns updated conversation
-
-### Frontend Changes
-
-#### Status Dropdown in Chat Header
-- Dropdown next to conversation name showing current status
-- Click to change — calls `PATCH /conversations/{id}/status`
-- Status badge colour updates instantly (optimistic UI)
-
-#### Escalate to Human Button
-- Red "Escalate to Human" button in chat header
-- One click → sets status to `escalated` + fires matching workflow if one exists
-- Inbox badge turns red for escalated conversations
-- Toast: "Conversation escalated — human agent notified"
-
-#### Status Badge Colours
-```text
-active     → blue
-lead       → amber
-booked     → emerald
-escalated  → red
-resolved   → neutral/grey
-```
-
-### Review Checklist
-- [ ] Status dropdown works and persists
-- [ ] Escalate button sets status to escalated instantly
-- [ ] Badge colour matches status
-- [ ] Workflow fires on escalation if rule exists
-- [ ] Toast confirms the action
-
----
-
-## Phase 16 — Polish: Skeletons, Empty States, Keyboard Nav (2 Hours)
-
-### Goal
-Production-grade feel — no blank flashes, no empty lists, keyboard-friendly.
-
-### 16a — Loading Skeletons
-Replace blank content during data fetch with animated skeleton loaders.
-
-Components to add skeletons to:
-- Conversation list (left sidebar)
-- Analytics stat cards
-- Leads table
-- Bookings table
-
-Skeleton style:
-```tsx
-<div className="animate-pulse rounded-md bg-neutral-200 h-4 w-3/4" />
-```
-
-### 16b — Empty States
-When a list has no data, show a friendly message + action instead of nothing.
-
-| Section | Empty State |
-|---|---|
-| Conversations | "No conversations yet. Share your widget to get started." + copy snippet button |
-| Leads | "No leads captured yet. The AI will collect them automatically." |
-| Bookings | "No bookings yet." |
-| Knowledge Base | "No documents uploaded. Add your FAQs to make the AI smarter." + upload button |
-| Workflow Logs | "No automations triggered yet." |
-
-### 16c — Keyboard Navigation
-- `↑` / `↓` arrow keys navigate conversations in the inbox list
-- `Enter` opens the selected conversation
-- `Escape` deselects / closes chat panel on mobile
-
-### Review Checklist
-- [ ] Skeletons appear on initial load, not blank
-- [ ] All empty states have helpful copy + action
-- [ ] Arrow key navigation works in conversation list
-- [ ] No layout shift when data loads in
-
----
-
-## Phase 17 — CSV Export for Leads (1 Hour)
-
-### Goal
-One-click download of all leads as a CSV file. Makes the Leads tab feel like a real CRM and is a common ask from any sales team.
-
-### Frontend Changes
-- Add "Export CSV" button in the Leads tab header
-- On click, convert leads array to CSV string and trigger download
-
-### CSV Columns
-```text
-Name, Email, Phone, Interest, Source Conversation, Captured At
-```
-
-### Implementation
-```ts
-function exportLeadsCSV(leads: Lead[]) {
-  const header = "Name,Email,Phone,Interest,Conversation,Captured At";
-  const rows = leads.map(l =>
-    [l.customer_name, l.email, l.phone, l.interest, l.conversation_id, l.created_at]
-      .map(v => `"${(v ?? "").replace(/"/g, '""')}"`)
-      .join(",")
-  );
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `omniflow-leads-${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-```
-
-### Review Checklist
-- [ ] Button visible in Leads tab
-- [ ] CSV downloads on click
-- [ ] All columns present and correctly escaped
-- [ ] Works with 0 leads (empty file with just header)
-
----
-
-## Phase 18 — WhatsApp Integration (3 Hours)
-
-### Goal
-Real WhatsApp messages flow into the OmniFlow inbox and the AI replies back through WhatsApp — the #1 channel for Indian businesses.
-
-### How It Works
-```text
-Customer sends WhatsApp message
-          |
-          v
-Meta Webhooks  →  POST /webhooks/whatsapp  (your backend)
-          |
-          v
-Normalise to OmniFlow message format
-          |
-          v
-AI generates reply  (same pipeline as web chat)
-          |
-          v
-POST to WhatsApp Cloud API  →  message delivered to customer
-          |
-          v
-Conversation appears in Unified Inbox with 📱 WhatsApp badge
-```
-
-### Requirements
-- Meta Developer Account (free)
-- WhatsApp Business App
-- WhatsApp Cloud API (free up to 1,000 conversations/month)
-- Public URL for webhook (use `ngrok` for local dev)
-
-### Backend Changes
-
-#### New Webhook Endpoint
+**Backend — SSE Endpoints:**
 ```python
-POST /webhooks/whatsapp
+GET /stream/conversations   → SSE stream, pushes updates on new message
+GET /stream/messages/{id}   → SSE stream, pushes new messages for a conversation
 ```
-- Verify webhook token (GET request from Meta during setup)
-- Parse incoming message payload
-- Create/find conversation by WhatsApp sender phone number
-- Store message in DB with `channel = "whatsapp"`
-- Trigger AI response
-- Send reply via WhatsApp Cloud API `POST /messages`
+- Use `asyncio.Queue` per connection
+- When a new message is saved (in `POST /messages`), push to all active SSE queues
+- `StreamingResponse` with `Content-Type: text/event-stream`
+- Heartbeat ping every 30s to keep connection alive
 
-#### New env vars
-```text
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_VERIFY_TOKEN=omniflow_verify_2024
-```
+**Frontend:**
+- Replace `setInterval(fetchConversations, 8000)` with `new EventSource(API_BASE + "/stream/conversations")`
+- On SSE event: parse JSON and update `conversations` state
+- Replace message polling with `EventSource` on selected conversation
+- Show "● LIVE" green indicator in inbox header when SSE is connected
+- Fallback to polling if `EventSource` fails (browser compatibility)
 
-### Frontend Changes
-- Conversation list shows 📱 WhatsApp channel badge
-- No other changes needed — inbox works the same
-
-### Review Checklist
-- [ ] Webhook verification handshake works
-- [ ] Incoming WhatsApp message appears in inbox
-- [ ] AI reply is sent back via WhatsApp Cloud API
-- [ ] Channel badge shows WhatsApp correctly
-- [ ] Conversation persists across messages from same number
+**Alternative:** If SSE adds complexity, keep polling but reduce to 3s and add optimistic UI updates. Label it "near real-time" in the demo.
 
 ---
 
-## Updated API Surface (Phase 13–18)
+## Phase 3 — Voice & CRM
+**Estimated Time: 3–5 hours | Impact: Very High | Effort: High**
 
-```text
-PATCH  /conversations/{id}/status     ← Phase 15
-GET    /messages/stream/{conv_id}     ← Phase 13 (SSE)
-POST   /webhooks/whatsapp             ← Phase 18
-GET    /webhooks/whatsapp             ← Phase 18 (verify)
+### 3.1 AI Voice Call Automation (Twilio)
+**Files:** `backend/app/main.py`, `backend/requirements.txt`
+
+**New Dependencies:**
+```
+twilio>=9.0.0
+```
+
+**Call Flow:**
+```
+Incoming Call
+   → Twilio routes to POST /voice/incoming
+   → TwiML: <Say> greeting + <Gather> speech input
+   → User speaks
+   → Twilio sends speech transcript to POST /voice/transcribed
+   → Backend: run transcript through generate_ai_response() (same RAG pipeline)
+   → Return TwiML <Say> with AI response text
+   → Caller hears the answer
+   → Conversation + transcript logged in DB as channel="phone"
+```
+
+**New Endpoints:**
+
+`POST /voice/incoming` — TwiML entry:
+```xml
+<Response>
+  <Say voice="Polly.Joanna">
+    Hi! You've reached OmniFlow AI. How can I help you today?
+  </Say>
+  <Gather input="speech" action="/voice/transcribed"
+          timeout="5" speechTimeout="auto" language="en-US">
+  </Gather>
+  <Say>I didn't catch that. Please call again.</Say>
+</Response>
+```
+
+`POST /voice/transcribed` — AI response:
+- Receive `SpeechResult` (Twilio form field)
+- Run through `generate_ai_response()` with `channel="phone"` conversation
+- Return TwiML `<Say>` with the reply
+- Loop back to `<Gather>` for multi-turn conversation support
+- Save full transcript as messages in DB
+
+**Environment Variables:**
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
+```
+
+**Twilio Setup Steps:**
+1. Create Twilio account at twilio.com (free trial gives $15 credit)
+2. Buy a phone number (~$1/mo, free with trial)
+3. Set webhook URL: `POST https://omniflow-api.onrender.com/voice/incoming`
+4. Set under Phone Numbers → Manage → A Call Comes In
+
+**Frontend:**
+- Add `phone` to `Channel` Literal type
+- Show phone/call icon for voice-originated conversations in inbox
+- Transcript appears as chat messages (AI side = AI responses, user side = speech transcripts)
+- Add "📞 Phone" to channel filter
+
+---
+
+### 3.2 Enhanced CRM Integration
+**Files:** `backend/app/main.py`, `frontend/app/dashboard/page.tsx`
+
+**Layer 1 — CSV Export** (Phase 1.1 already covers this)
+
+**Layer 2 — Improved Google Sheets Sync:**
+- Currently only syncs leads on create; extend to sync bookings too
+- Add `POST /integrations/sheets/sync` — manual full re-sync of ALL leads + bookings to Sheets
+- Add "Sync to Sheets" button in Settings tab
+
+**Layer 3 — HubSpot CRM Push (stretch goal):**
+- On lead create, push to HubSpot: `POST https://api.hubapi.com/crm/v3/objects/contacts`
+- Map fields: email → email, customer_name → firstname, phone → phone, interest → jobtitle
+- Env var: `HUBSPOT_API_KEY`
+- Falls back silently if key not set
+
+**Frontend — Settings Tab Integration Panel:**
+- Add "Integrations" section in Settings
+- Google Sheets: show connection status + "Sync Now" button + last sync timestamp
+- HubSpot: "Connect" button → input field for API key → save to backend env
+- CSV: direct download buttons for Leads and Bookings
+
+---
+
+## Phase 4 — LinkedIn & Final Polish
+**Estimated Time: 1–2 hours | Impact: Medium | Effort: Low**
+
+### 4.1 LinkedIn Messaging
+**Context:** LinkedIn's Messaging API requires an **official LinkedIn Partner** status (weeks-long approval). Real integration is not feasible for this hackathon.
+
+**Strategy — Architecture-Ready Stub:**
+
+**Backend:**
+- Add `linkedin` to `Channel` Literal type
+- Add placeholder `POST /webhook/linkedin` that accepts a message payload and stores it as a conversation with `channel="linkedin"`
+- Add `GET /debug/linkedin` that returns API status info
+
+**Frontend:**
+- Add LinkedIn channel option in inbox filter (LinkedIn icon, blue badge)
+- Add a LinkedIn seed conversation in the dashboard
+- In Settings tab: add "Connect LinkedIn" card → clicking shows modal:
+  > *"LinkedIn Partner API access is pending approval. The integration architecture is complete and ready to activate once approved. Expected: Q3 2026."*
+
+**Demo Script:** Show the LinkedIn channel in the inbox filter, explain the architecture, and note the approval wall — judges understand API restrictions.
+
+---
+
+### 4.2 Final Polish & Demo Preparation
+
+**UI Polish:**
+- [ ] Replace spinners with skeleton loading screens in all tabs
+- [ ] Add empty state screens with helpful CTAs:
+  - No leads yet → "Start a conversation to capture your first lead"
+  - No bookings → "Ask the AI to help book an appointment"
+  - No workflows → "Create your first automation rule"
+- [ ] Audit mobile responsiveness of dashboard
+- [ ] Verify all channel color badges are consistent
+
+**Demo Data:**
+- [ ] Seed conversations for all 5 channels: website, whatsapp, facebook, instagram, phone (+ linkedin stub)
+- [ ] Pre-upload NovaTech Solutions KB document on production DB
+- [ ] Verify all 3 default workflows are active on production
+- [ ] Clear any test junk data from production DB before recording
+
+**Token Refresh Checklist (before video):**
+- [ ] Refresh `WHATSAPP_ACCESS_TOKEN` in Render env vars
+- [ ] Refresh `FB_PAGE_ACCESS_TOKEN` in Render env vars
+- [ ] Call `POST /debug/facebook/subscribe` to re-subscribe FB webhook
+- [ ] Verify `GET /debug/whatsapp` returns `status: ok`
+- [ ] Verify `GET /debug/facebook` returns `status: ok` with subscriptions
+
+**Video Recording (max 2 min):**
+1. Show landing page + chat widget
+2. Show unified inbox (all channels)
+3. Demo WhatsApp live reply
+4. Demo Facebook live reply
+5. Show Knowledge Base (NovaTech KB loaded)
+6. Show Lead auto-capture
+7. Show Booking via chat
+8. Show Workflows running
+9. Show Analytics dashboard
+10. Show Notifications + Team Assignment
+11. Mention: Instagram (architecture ready), LinkedIn (approval pending), Voice (Twilio live)
+
+---
+
+## Implementation Order
+
+```
+Day 1 (Today)
+├── Phase 1.1 — CSV Export           (~30 min)
+├── Phase 1.2 — Notifications         (~45 min)
+├── Phase 1.3 — Team Assignment       (~45 min)
+└── Phase 4.1 — LinkedIn UI stub      (~30 min)
+                                     Total: ~2.5 hrs
+
+Day 2
+├── Phase 2.1 — Instagram webhook     (~60 min)
+├── Phase 2.2 — SSE Real-time inbox   (~90 min)
+└── Phase 3.2 — CRM improvements     (~60 min)
+                                     Total: ~3.5 hrs
+
+Day 3
+├── Phase 3.1 — Twilio Voice          (~3–4 hrs)
+└── Phase 4.2 — Polish + Video        (~2 hrs)
+                                     Total: ~5–6 hrs
 ```
 
 ---
 
-## Priority Order for Day 4–5
+## Projected Feature Completion After All Phases
 
-### Day 4 (Core wow + data)
-1. Phase 13 — Streaming AI responses
-2. Phase 14 — Analytics charts
-3. Phase 15 — Conversation status + Escalate button
-4. Phase 17 — CSV export (quick win, 1 hour)
+| Feature | Before | After |
+|---|---|---|
+| WhatsApp Automation | ✅ | ✅ |
+| Facebook Inbox Automation | ✅ | ✅ |
+| Website Chat Widget | ✅ | ✅ |
+| Instagram Auto Reply | ❌ | ✅ Phase 2.1 |
+| LinkedIn Messaging | ❌ | ⚠️ Phase 4.1 (UI + stub) |
+| AI Voice Call Automation | ❌ | ✅ Phase 3.1 |
+| Unified Inbox | ✅ | ✅ |
+| AI Response Engine (RAG) | ✅ | ✅ |
+| Knowledge Base Training | ✅ | ✅ |
+| Lead Capture | ✅ | ✅ |
+| Booking Management | ✅ | ✅ |
+| Customer Data Collection | ✅ | ✅ |
+| Sheet Export / CRM | ✅ | ✅ Phase 3.2 |
+| Analytics Dashboard | ✅ | ✅ |
+| Notifications | ❌ | ✅ Phase 1.2 |
+| Team Assignment | ❌ | ✅ Phase 1.3 |
+| Workflow Automation | ✅ | ✅ |
+| Real-Time WebSocket | ⚠️ | ✅ Phase 2.2 |
 
-### Day 5 (Integrations + polish)
-5. Phase 18 — WhatsApp integration
-6. Phase 16 — Skeletons, empty states, keyboard nav
+**Projected score: 17/18 features complete (94%)**
+LinkedIn is the only feature blocked by an external API approval process.
 
 ---
 
-## Pitch-Ready Checklist
+## Environment Variables Checklist
 
-- [ ] Streaming AI responses live in demo
-- [ ] Analytics charts showing real data
-- [ ] Agent can manually escalate a conversation
-- [ ] Leads exportable as CSV
-- [ ] WhatsApp message flows into inbox
-- [ ] All channel badges display correctly
-- [ ] No blank loading states
-- [ ] Empty states have helpful CTAs
-- [ ] Demo script rehearsed end-to-end
+| Variable | Used For | Status |
+|---|---|---|
+| `GROQ_API_KEY` | AI responses | ✅ Set |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | ✅ Set (expires 24h) |
+| `WHATSAPP_ACCESS_TOKEN` | WhatsApp | ✅ Set (expires 24h) |
+| `FB_PAGE_ACCESS_TOKEN` | Facebook | ✅ Set (expires 24h) |
+| `IG_PAGE_ACCESS_TOKEN` | Instagram | ❌ Needed |
+| `IG_VERIFY_TOKEN` | Instagram | ❌ Needed |
+| `TWILIO_ACCOUNT_SID` | Voice calls | ❌ Needed |
+| `TWILIO_AUTH_TOKEN` | Voice calls | ❌ Needed |
+| `TWILIO_PHONE_NUMBER` | Voice calls | ❌ Needed |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Sheets sync | ⚠️ Optional |
+| `GOOGLE_SHEETS_ID` | Sheets sync | ⚠️ Optional |
+| `HUBSPOT_API_KEY` | CRM push | ❌ Optional stretch |
+
+---
+
+*Last updated: 2026-05-27*
+*Hackathon: SummerShip Challenge 2026 · Problem Code #05*
