@@ -1201,6 +1201,59 @@ def list_conversations(db: Session = Depends(get_db)) -> list[Conversation]:
     return [row_to_conversation(r) for r in rows]
 
 
+class DemoInject(BaseModel):
+    customer_name: str
+    channel:       str
+    message:       str
+
+@app.post("/demo/inject")
+async def demo_inject(payload: DemoInject, db: Session = Depends(get_db)):
+    """Inject a demo conversation + AI reply for any channel (for demo/testing only)."""
+    conv_id = f"demo_{uuid4().hex[:12]}"
+    conv = ConversationRow(
+        id=conv_id,
+        customer_name=payload.customer_name,
+        channel=payload.channel,
+        status="active",
+        last_message=payload.message,
+        updated_at=utc_now(),
+        unread_count=1,
+    )
+    db.add(conv)
+    db.commit()
+
+    user_msg = MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="user",
+        body=payload.message,
+        created_at=utc_now(),
+    )
+    db.add(user_msg)
+    db.commit()
+
+    history = [{"role": "user", "content": payload.message}]
+    ai_text = generate_ai_response(history, db)
+
+    ai_msg = MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="ai",
+        body=ai_text,
+        created_at=utc_now(),
+    )
+    db.add(ai_msg)
+    conv.last_message = ai_text
+    conv.updated_at   = utc_now()
+    db.commit()
+
+    _broadcast_conv_update(row_to_conversation(
+        db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+    ))
+
+    return {"conversation_id": conv_id, "ai_reply": ai_text}
+
+
 @app.get("/messages/{conversation_id}", response_model=list[Message])
 def list_messages(conversation_id: str, db: Session = Depends(get_db)) -> list[Message]:
     rows = (
