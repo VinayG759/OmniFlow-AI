@@ -111,6 +111,7 @@ const channelMeta: Record<Channel, { label: string; icon: typeof MessageSquareTe
   email:     { label: "Email",     icon: Mail },
   facebook:  { label: "Facebook",  icon: Share2 },
   instagram: { label: "Instagram", icon: Camera },
+  phone:     { label: "Phone",     icon: Phone },
 };
 
 type ChannelTheme = {
@@ -180,6 +181,17 @@ const channelTheme: Record<Channel, ChannelTheme> = {
     sendBtn:    "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white",
     focusRing:  "focus:border-pink-400 focus:ring-2 focus:ring-pink-100",
     headerBar:  "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400",
+  },
+  phone: {
+    avatarBg:   "bg-teal-600",
+    badgeBg:    "bg-teal-50 text-teal-700 ring-teal-200",
+    chatBg:     "bg-neutral-50",
+    userBubble: "bg-teal-700 text-white",
+    userBadge:  "bg-white/20 text-white",
+    userTime:   "text-teal-100",
+    sendBtn:    "bg-teal-600 hover:bg-teal-500 text-white",
+    focusRing:  "focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
+    headerBar:  "bg-teal-700",
   },
 };
 
@@ -1246,6 +1258,7 @@ export default function DashboardPage() {
                       <option value="facebook">📘 Facebook</option>
                       <option value="instagram">📸 Instagram</option>
                       <option value="email">✉️ Email</option>
+                      <option value="phone">📞 Phone</option>
                     </select>
                   </div>
 
@@ -1361,6 +1374,15 @@ export default function DashboardPage() {
                           )}
                           {selectedConversation.channel === "email" && (
                             <><Mail className="h-3.5 w-3.5" /><span>Email Channel</span></>
+                          )}
+                          {selectedConversation.channel === "phone" && (
+                            <><Phone className="h-3.5 w-3.5" /><span>AI Voice Call · Powered by Twilio</span></>
+                          )}
+                          {selectedConversation.channel === "facebook" && (
+                            <><Share2 className="h-3.5 w-3.5" /><span>Facebook Messenger</span></>
+                          )}
+                          {selectedConversation.channel === "instagram" && (
+                            <><Camera className="h-3.5 w-3.5" /><span>Instagram Direct</span></>
                           )}
                         </div>
                       )}
