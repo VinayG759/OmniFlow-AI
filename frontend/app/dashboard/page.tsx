@@ -1672,22 +1672,33 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {documents.map((doc) => (
-                      <article
-                        key={doc.id}
-                        className="rounded-md border border-neutral-200 bg-neutral-50 p-4"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="truncate text-sm font-semibold">{doc.name}</p>
-                          <span className="rounded-md bg-white px-2 py-1 text-xs font-medium uppercase text-neutral-500">
-                            {doc.kind}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-sm text-neutral-500">
-                          {doc.chunk_count} chunks indexed
-                        </p>
-                      </article>
-                    ))}
+                    {isLoadingConversations && documents.length === 0
+                      ? [...Array(3)].map((_, i) => (
+                          <div key={i} className="animate-pulse rounded-md border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="h-3 w-2/3 rounded bg-neutral-200" />
+                              <div className="h-5 w-10 rounded bg-neutral-100" />
+                            </div>
+                            <div className="h-3 w-1/3 rounded bg-neutral-100" />
+                          </div>
+                        ))
+                      : documents.map((doc) => (
+                          <article
+                            key={doc.id}
+                            className="rounded-md border border-neutral-200 bg-neutral-50 p-4"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="truncate text-sm font-semibold">{doc.name}</p>
+                              <span className="rounded-md bg-white px-2 py-1 text-xs font-medium uppercase text-neutral-500">
+                                {doc.kind}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm text-neutral-500">
+                              {doc.chunk_count} chunks indexed
+                            </p>
+                          </article>
+                        ))
+                    }
                   </div>
                 </div>
 
@@ -2104,9 +2115,21 @@ export default function DashboardPage() {
                   {/* ── Left: rule list ── */}
                   <div className="space-y-4">
                     {isLoadingWorkflows ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Loading rules…
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="animate-pulse rounded-lg border border-neutral-200 bg-white p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="h-3 w-2/3 rounded bg-neutral-200" />
+                              <div className="h-5 w-20 rounded-md bg-neutral-100" />
+                            </div>
+                            <div className="h-3 w-full rounded bg-neutral-100" />
+                            <div className="h-3 w-1/2 rounded bg-neutral-100" />
+                            <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
+                              <div className="h-3 w-16 rounded bg-neutral-100" />
+                              <div className="h-6 w-6 rounded-full bg-neutral-100" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : workflows.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
@@ -2361,9 +2384,25 @@ export default function DashboardPage() {
                 </div>
 
                 {isLoadingAnalytics && !analytics ? (
-                  <div className="flex h-48 items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="animate-pulse rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+                          <div className="mb-3 h-9 w-9 rounded-lg bg-neutral-200" />
+                          <div className="h-7 w-12 rounded bg-neutral-200" />
+                          <div className="mt-1.5 h-3 w-20 rounded bg-neutral-100" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {[...Array(2)].map((_, i) => (
+                        <div key={i} className="animate-pulse rounded-xl border border-neutral-200 bg-white p-5">
+                          <div className="mb-4 h-3 w-48 rounded bg-neutral-200" />
+                          <div className="h-48 w-full rounded-md bg-neutral-100" />
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 ) : analytics ? (
                   <>
                     {/* ── Metric cards ──────────────────────────────────── */}
