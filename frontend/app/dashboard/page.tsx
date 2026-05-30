@@ -36,6 +36,7 @@ import {
   Camera,
   Share2,
   RefreshCw,
+  ArrowRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1838,6 +1839,16 @@ export default function DashboardPage() {
                               </div>
                             ) : null}
                           </div>
+
+                          {/* Next Action recommendation */}
+                          {lead.next_action && (
+                            <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 ring-1 ring-amber-200">
+                              <ArrowRight className="h-3 w-3 shrink-0 text-amber-500" />
+                              <span className="text-xs font-medium text-amber-700">
+                                {lead.next_action}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Footer */}
                           <div className="flex items-center justify-between border-t border-neutral-200 pt-3">

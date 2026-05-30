@@ -45,6 +45,7 @@ export type Lead = {
   channel: Channel;
   created_at: string;
   score: number;
+  next_action?: string;
 };
 
 export type Booking = {

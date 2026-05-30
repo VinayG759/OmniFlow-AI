@@ -258,6 +258,7 @@ class Lead(BaseModel):
     channel: Channel
     created_at: str
     score: int = 0
+    next_action: str = ""
 
 
 class LeadCreate(BaseModel):
@@ -366,6 +367,26 @@ def row_to_chunk(r: KnowledgeChunkRow) -> KnowledgeChunk:
         document_name=r.document_name, text=r.text,
     )
 
+def crm_recommendation(lead: LeadRow) -> str:
+    score    = lead.score or 0
+    interest = lead.interest or "General inquiry"
+    if interest == "Billing / refund":
+        return "Escalate to support"
+    if interest == "Demo request":
+        return "Book demo call" if score >= 71 else "Send demo info"
+    if interest == "Pricing inquiry":
+        if score >= 71:
+            return "Book a pricing call"
+        return "Share pricing tiers" if score >= 41 else "Nurture with content"
+    if interest == "Appointment booking":
+        return "Confirm appointment"
+    if interest == "Integration inquiry":
+        return "Send API docs"
+    if score >= 71:
+        return "Call immediately"
+    return "Send follow-up email" if score >= 41 else "Add to nurture list"
+
+
 def row_to_lead(r: LeadRow) -> Lead:
     return Lead(
         id=r.id, conversation_id=r.conversation_id,
@@ -373,6 +394,7 @@ def row_to_lead(r: LeadRow) -> Lead:
         phone=r.phone or "", interest=r.interest or "General inquiry",
         channel=r.channel, created_at=r.created_at,
         score=r.score or 0,
+        next_action=crm_recommendation(r),
     )
 
 def row_to_booking(r: BookingRow) -> Booking:
