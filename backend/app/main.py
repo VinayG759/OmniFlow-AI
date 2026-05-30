@@ -1235,6 +1235,27 @@ def ai_status() -> dict[str, str]:
     return {"provider": provider, "model": model}
 
 
+@app.get("/admin/migrate")
+def admin_migrate():
+    """Force-run schema migrations and return per-statement results."""
+    results = []
+    stmts = [
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_to VARCHAR",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sentiment VARCHAR DEFAULT 'neutral'",
+        "ALTER TABLE leads ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0",
+    ]
+    for stmt in stmts:
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa_text(stmt))
+                conn.commit()
+                results.append({"sql": stmt, "status": "ok"})
+            except Exception as exc:
+                conn.rollback()
+                results.append({"sql": stmt, "status": "error", "detail": str(exc)})
+    return {"migrations": results}
+
+
 @app.get("/debug/whatsapp")
 def debug_whatsapp():
     """Test WhatsApp token validity without sending a real message."""
