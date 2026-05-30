@@ -1819,15 +1819,13 @@ def export_leads_csv(db: Session = Depends(get_db)) -> Response:
 
 @app.post("/broadcast")
 def broadcast_whatsapp(payload: BroadcastPayload, db: Session = Depends(get_db)):
-    """Send a WhatsApp template message to all leads from the WhatsApp channel that have a phone number.
-    Uses the 'omniflow_broadcast' template (body = {{1}}) so the custom message text is delivered.
-    Falls back to 'hello_world' if the custom template is not yet approved."""
+    """Send a WhatsApp hello_world template to all WhatsApp leads that have a phone number."""
     whatsapp_leads = db.query(LeadRow).filter(LeadRow.channel == "whatsapp").all()
     sent = 0
     skipped = 0
     for lead in whatsapp_leads:
         if lead.phone:
-            send_whatsapp_template(lead.phone, template_name="omniflow_broadcast", body_text=payload.message)
+            send_whatsapp_template(lead.phone, template_name="hello_world")
             sent += 1
         else:
             skipped += 1
