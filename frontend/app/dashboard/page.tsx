@@ -1352,6 +1352,20 @@ export default function DashboardPage() {
                                   {conversation.assigned_to}
                                 </span>
                               )}
+                              {(() => {
+                                const s = conversation.sentiment ?? "neutral";
+                                const emoji = s === "positive" ? "😊" : s === "negative" ? "😠" : "😐";
+                                const cls   = s === "positive"
+                                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                  : s === "negative"
+                                  ? "bg-rose-50 text-rose-700 ring-rose-200"
+                                  : "bg-neutral-100 text-neutral-500 ring-neutral-200";
+                                return (
+                                  <span className={`rounded-md px-2 py-1 text-xs font-medium ring-1 ${cls}`} title={`Sentiment: ${s}`}>
+                                    {emoji}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <p className="mt-2 line-clamp-2 text-sm leading-5 text-neutral-500">
                               {conversation.last_message}

@@ -185,6 +185,7 @@ class Conversation(BaseModel):
     updated_at: str
     unread_count: int = 0
     assigned_to: str | None = None
+    sentiment: str = "neutral"
 
 
 class Message(BaseModel):
@@ -308,6 +309,7 @@ def row_to_conversation(r: ConversationRow) -> Conversation:
         status=r.status, last_message=r.last_message or "",
         updated_at=r.updated_at, unread_count=r.unread_count or 0,
         assigned_to=r.assigned_to or None,
+        sentiment=r.sentiment or "neutral",
     )
 
 def row_to_message(r: MessageRow) -> Message:
@@ -511,6 +513,28 @@ def detect_interest(user_texts: str) -> str:
 
 _HOT_KEYWORDS  = {"buy","purchase","demo","trial","sign up","pricing","book","subscribe","upgrade","plan"}
 _WARM_KEYWORDS = {"interested","tell me more","features","comparison","cost","how much","options","info"}
+
+_POSITIVE_KEYWORDS: frozenset[str] = frozenset([
+    "great", "thanks", "thank you", "helpful", "perfect", "awesome", "love",
+    "excellent", "amazing", "wonderful", "good", "nice", "happy", "pleased",
+    "fantastic", "brilliant", "superb", "appreciate", "grateful",
+])
+_NEGATIVE_KEYWORDS: frozenset[str] = frozenset([
+    "angry", "terrible", "worst", "hate", "disgusting", "awful", "horrible",
+    "bad", "frustrated", "useless", "disappointed", "unacceptable", "refund",
+    "urgent", "asap", "emergency", "scam", "fraud", "furious", "ridiculous",
+    "pathetic", "waste", "broken", "never works",
+])
+
+
+def detect_sentiment(message: str) -> str:
+    lower = message.lower()
+    if any(k in lower for k in _NEGATIVE_KEYWORDS):
+        return "negative"
+    if any(k in lower for k in _POSITIVE_KEYWORDS):
+        return "positive"
+    return "neutral"
+
 
 def compute_lead_score(message: str, channel: str) -> int:
     lower = message.lower()
@@ -1098,6 +1122,14 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         try:
             conn.execute(sa_text(
                 "ALTER TABLE leads ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0"
+            ))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    with engine.connect() as conn:
+        try:
+            conn.execute(sa_text(
+                "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sentiment VARCHAR DEFAULT 'neutral'"
             ))
             conn.commit()
         except Exception:
@@ -1819,6 +1851,7 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
     conv_row.last_message = ai_body
     conv_row.updated_at   = ai_msg_row.created_at
     conv_row.unread_count = 0
+    conv_row.sentiment    = detect_sentiment(payload.body)
 
     # Phase 8 — auto-escalate if not already handled by a workflow
     if (

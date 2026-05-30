@@ -11,6 +11,7 @@ export type Conversation = {
   updated_at: string;
   unread_count: number;
   assigned_to?: string | null;
+  sentiment?: string;
 };
 
 export type Message = {
