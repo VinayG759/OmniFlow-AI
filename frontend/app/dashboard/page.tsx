@@ -68,6 +68,7 @@ import {
   Message,
   NameValue,
   streamMessage,
+  broadcastWhatsApp,
   syncLeadsToSheets,
   toggleWorkflow,
   uploadDocument,
@@ -289,6 +290,11 @@ export default function DashboardPage() {
   const [wfAction, setWfAction] = useState<WorkflowAction>("escalate");
   const [wfActionValue, setWfActionValue] = useState("");
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
+
+  // Broadcast state
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   // Analytics state
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
@@ -873,6 +879,29 @@ export default function DashboardPage() {
       addToast("Sheets sync failed. Check backend logs.", "error");
     } finally {
       setIsSyncingSheets(false);
+    }
+  }
+
+  async function handleBroadcast(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!broadcastMessage.trim()) return;
+    setIsBroadcasting(true);
+    try {
+      const result = await broadcastWhatsApp(broadcastMessage.trim());
+      if (result.total === 0) {
+        addToast("No WhatsApp leads found to broadcast to.", "info");
+      } else {
+        addToast(
+          `📣 Broadcast sent to ${result.sent} WhatsApp lead${result.sent !== 1 ? "s" : ""}${result.skipped > 0 ? ` (${result.skipped} skipped — no phone)` : ""}.`,
+          "success",
+        );
+      }
+      setShowBroadcastModal(false);
+      setBroadcastMessage("");
+    } catch {
+      addToast("Broadcast failed. Check WhatsApp credentials in backend.", "error");
+    } finally {
+      setIsBroadcasting(false);
     }
   }
 
@@ -1685,6 +1714,16 @@ export default function DashboardPage() {
                         : <RefreshCw className="h-3.5 w-3.5" />}
                       Sync to Sheets
                     </button>
+                    <button
+                      onClick={() => setShowBroadcastModal(true)}
+                      disabled={leads.filter(l => l.channel === "whatsapp" && l.phone).length === 0}
+                      className="flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-sm text-green-700 shadow-sm transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      type="button"
+                      title="Send a WhatsApp message to all WhatsApp leads"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      WA Broadcast
+                    </button>
                   </div>
                 </div>
 
@@ -1793,6 +1832,78 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </section>
+            )}
+
+            {/* ── WhatsApp Broadcast Modal ──────────────────────────────────── */}
+            {showBroadcastModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-2xl">
+                  {/* Modal header */}
+                  <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-green-100 text-green-700">
+                        <Share2 className="h-4 w-4" />
+                      </div>
+                      <h2 className="text-base font-semibold">WhatsApp Broadcast</h2>
+                    </div>
+                    <button
+                      onClick={() => { setShowBroadcastModal(false); setBroadcastMessage(""); }}
+                      className="rounded-md p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600"
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Modal body */}
+                  <form onSubmit={handleBroadcast} className="flex flex-col gap-4 p-5">
+                    <div className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 ring-1 ring-green-200">
+                      📣 This will send your message to{" "}
+                      <strong>{leads.filter(l => l.channel === "whatsapp" && l.phone).length}</strong>{" "}
+                      WhatsApp lead{leads.filter(l => l.channel === "whatsapp" && l.phone).length !== 1 ? "s" : ""} with a phone number.
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-neutral-700">
+                        Message
+                      </label>
+                      <textarea
+                        value={broadcastMessage}
+                        onChange={(e) => setBroadcastMessage(e.target.value)}
+                        placeholder="Hi! We have a special offer just for you…"
+                        rows={4}
+                        maxLength={1000}
+                        className="w-full resize-none rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 shadow-sm outline-none transition focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                        required
+                      />
+                      <p className="text-right text-xs text-neutral-400">
+                        {broadcastMessage.length}/1000
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 border-t border-neutral-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => { setShowBroadcastModal(false); setBroadcastMessage(""); }}
+                        className="rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isBroadcasting || !broadcastMessage.trim()}
+                        className="flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isBroadcasting ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+                        ) : (
+                          <><Send className="h-3.5 w-3.5" /> Send Broadcast</>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             )}
 
             {/* ══════════════════════════════════════

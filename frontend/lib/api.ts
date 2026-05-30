@@ -275,6 +275,13 @@ export function syncLeadsToSheets() {
   return apiFetch<{ synced: number }>("/leads/sync-sheets", { method: "POST" });
 }
 
+export function broadcastWhatsApp(message: string) {
+  return apiFetch<{ sent: number; skipped: number; total: number }>("/broadcast", {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
 export async function uploadDocument(file: File) {
   const formData = new FormData();
   formData.append("file", file);

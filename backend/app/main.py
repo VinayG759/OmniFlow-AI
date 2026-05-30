@@ -289,6 +289,10 @@ class NameValue(BaseModel):
     value: int
 
 
+class BroadcastPayload(BaseModel):
+    message: str = Field(..., min_length=1, max_length=1000)
+
+
 class AnalyticsSummary(BaseModel):
     total_conversations: int
     ai_replies:          int
@@ -1705,6 +1709,21 @@ def export_leads_csv(db: Session = Depends(get_db)) -> Response:
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=omniflow-leads.csv"},
     )
+
+
+@app.post("/broadcast")
+def broadcast_whatsapp(payload: BroadcastPayload, db: Session = Depends(get_db)):
+    """Send a WhatsApp message to all leads that came via the WhatsApp channel and have a phone number."""
+    whatsapp_leads = db.query(LeadRow).filter(LeadRow.channel == "whatsapp").all()
+    sent = 0
+    skipped = 0
+    for lead in whatsapp_leads:
+        if lead.phone:
+            send_whatsapp_reply(lead.phone, payload.message)
+            sent += 1
+        else:
+            skipped += 1
+    return {"sent": sent, "skipped": skipped, "total": len(whatsapp_leads)}
 
 
 @app.get("/bookings/export")
