@@ -722,6 +722,7 @@ export default function DashboardPage() {
 
   async function handleUploadDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!selectedFile) {
       addToast("Choose a TXT, Markdown, or PDF file first.", "info");
       return;
@@ -740,7 +741,7 @@ export default function DashboardPage() {
       const uploaded = await uploadDocument(selectedFile);
       setDocuments((prev) => [uploaded, ...prev]);
       setSelectedFile(null);
-      event.currentTarget.reset();
+      form.reset();
       addToast(`"${uploaded.name}" added to the knowledge base.`);
     } catch (error) {
       addToast(error instanceof Error ? error.message : "Document upload failed.", "error");
