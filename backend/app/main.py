@@ -2333,7 +2333,10 @@ async def voice_recording(request: Request, db: Session = Depends(get_db)):
           f"twilio_sid={'yes' if twilio_account_sid else 'NO'} "
           f"twilio_token={'yes' if twilio_auth_token else 'NO'}")
 
-    if recording_url and openai_client and twilio_account_sid and twilio_auth_token:
+    stt_client = groq_client or openai_client
+    stt_model  = "whisper-large-v3-turbo" if groq_client else "whisper-1"
+
+    if recording_url and stt_client and twilio_account_sid and twilio_auth_token:
         try:
             audio_resp = http_requests.get(
                 recording_url + ".mp3",
@@ -2344,8 +2347,8 @@ async def voice_recording(request: Request, db: Session = Depends(get_db)):
             if audio_resp.status_code == 200:
                 audio_bytes = io.BytesIO(audio_resp.content)
                 audio_bytes.name = "recording.mp3"
-                whisper_resp = openai_client.audio.transcriptions.create(
-                    model="whisper-1",
+                whisper_resp = stt_client.audio.transcriptions.create(
+                    model=stt_model,
                     file=audio_bytes,
                     language="en",
                     prompt=(
