@@ -88,7 +88,7 @@ def send_whatsapp_reply(to: str, body: str) -> None:
         return  # credentials not configured — skip silently
     try:
         http_requests.post(
-            f"https://graph.facebook.com/v18.0/{wa_phone_number_id}/messages",
+            f"https://graph.facebook.com/v19.0/{wa_phone_number_id}/messages",
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {wa_access_token}",
@@ -103,6 +103,29 @@ def send_whatsapp_reply(to: str, body: str) -> None:
         )
     except Exception:
         pass  # never crash the webhook handler if the outbound call fails
+
+
+def send_whatsapp_template(to: str, template_name: str = "hello_world", language_code: str = "en_US") -> None:
+    """Send a WhatsApp template message — required to initiate a conversation (no prior customer message)."""
+    if not wa_phone_number_id or not wa_access_token:
+        return
+    try:
+        http_requests.post(
+            f"https://graph.facebook.com/v19.0/{wa_phone_number_id}/messages",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {wa_access_token}",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "template",
+                "template": {"name": template_name, "language": {"code": language_code}},
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def send_facebook_reply(recipient_psid: str, body: str) -> None:
@@ -1713,13 +1736,15 @@ def export_leads_csv(db: Session = Depends(get_db)) -> Response:
 
 @app.post("/broadcast")
 def broadcast_whatsapp(payload: BroadcastPayload, db: Session = Depends(get_db)):
-    """Send a WhatsApp message to all leads that came via the WhatsApp channel and have a phone number."""
+    """Send a WhatsApp template message to all leads from the WhatsApp channel that have a phone number.
+    Uses send_whatsapp_template (hello_world) to initiate the conversation — required by Meta when no
+    prior customer message exists. Free-text reply is used only inside active 24h customer service windows."""
     whatsapp_leads = db.query(LeadRow).filter(LeadRow.channel == "whatsapp").all()
     sent = 0
     skipped = 0
     for lead in whatsapp_leads:
         if lead.phone:
-            send_whatsapp_reply(lead.phone, payload.message)
+            send_whatsapp_template(lead.phone)
             sent += 1
         else:
             skipped += 1
