@@ -93,6 +93,7 @@ class LeadRow(Base):
     interest        = Column(String, default="General inquiry")
     channel         = Column(String, nullable=False)
     created_at      = Column(String, nullable=False)
+    score           = Column(Integer, default=0)
 
     __table_args__ = (
         UniqueConstraint("email", name="uq_leads_email"),

@@ -43,6 +43,7 @@ export type Lead = {
   interest: string;
   channel: Channel;
   created_at: string;
+  score: number;
 };
 
 export type Booking = {

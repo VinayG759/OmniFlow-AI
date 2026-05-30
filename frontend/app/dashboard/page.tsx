@@ -1705,13 +1705,20 @@ export default function DashboardPage() {
                       const ChannelIcon = channelMeta[lead.channel]?.icon ?? Globe;
                       const interestClass =
                         interestColors[lead.interest] ?? interestColors["General inquiry"];
+                      const score = lead.score ?? 0;
+                      const scoreBadge =
+                        score >= 71
+                          ? { label: "Hot", cls: "bg-red-50 text-red-600 ring-red-200" }
+                          : score >= 41
+                          ? { label: "Warm", cls: "bg-amber-50 text-amber-600 ring-amber-200" }
+                          : { label: "Cold", cls: "bg-sky-50 text-sky-600 ring-sky-200" };
 
                       return (
                         <article
                           key={lead.id}
                           className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 transition hover:border-cyan-300 hover:shadow-sm"
                         >
-                          {/* Name + channel */}
+                          {/* Name + score badge */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-950 text-white">
@@ -1721,11 +1728,18 @@ export default function DashboardPage() {
                                 {lead.customer_name}
                               </p>
                             </div>
-                            <span
-                              className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ring-1 ${interestClass}`}
-                            >
-                              {lead.interest}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span
+                                className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ${scoreBadge.cls}`}
+                              >
+                                {scoreBadge.label} · {score}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${interestClass}`}
+                              >
+                                {lead.interest}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Contact details */}

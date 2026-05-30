@@ -224,6 +224,7 @@ class Lead(BaseModel):
     interest: str
     channel: Channel
     created_at: str
+    score: int = 0
 
 
 class LeadCreate(BaseModel):
@@ -333,6 +334,7 @@ def row_to_lead(r: LeadRow) -> Lead:
         customer_name=r.customer_name, email=r.email,
         phone=r.phone or "", interest=r.interest or "General inquiry",
         channel=r.channel, created_at=r.created_at,
+        score=r.score or 0,
     )
 
 def row_to_booking(r: BookingRow) -> Booking:
@@ -507,6 +509,23 @@ def detect_interest(user_texts: str) -> str:
     return "General inquiry"
 
 
+_HOT_KEYWORDS  = {"buy","purchase","demo","trial","sign up","pricing","book","subscribe","upgrade","plan"}
+_WARM_KEYWORDS = {"interested","tell me more","features","comparison","cost","how much","options","info"}
+
+def compute_lead_score(message: str, channel: str) -> int:
+    lower = message.lower()
+    score = 30
+    if any(k in lower for k in _HOT_KEYWORDS):
+        score += 50
+    elif any(k in lower for k in _WARM_KEYWORDS):
+        score += 25
+    if channel in ("whatsapp", "phone"):
+        score += 10
+    if len(message.split()) > 15:
+        score += 10
+    return min(score, 100)
+
+
 def try_capture_lead(
     conv_row: ConversationRow,
     user_message: str,
@@ -558,6 +577,7 @@ def try_capture_lead(
         interest=detect_interest(all_user_text),
         channel=conv_row.channel,
         created_at=utc_now(),
+        score=compute_lead_score(all_user_text, conv_row.channel),
     )
     db.add(lead_row)
     conv_row.status = "lead"
@@ -1074,6 +1094,14 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
             conn.commit()
         except Exception:
             conn.rollback()
+    with engine.connect() as conn:
+        try:
+            conn.execute(sa_text(
+                "ALTER TABLE leads ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0"
+            ))
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
     db: Session = SessionLocal()
     try:
@@ -1318,15 +1346,17 @@ def create_lead(payload: LeadCreate, db: Session = Depends(get_db)) -> Lead:
         raise HTTPException(status_code=409, detail="A lead with this email already exists.")
     conv_row = db.query(ConversationRow).filter(ConversationRow.id == payload.conversation_id).first()
     channel: Channel = conv_row.channel if conv_row else "website"
+    interest = payload.interest.strip() or "General inquiry"
     lead_row = LeadRow(
         id=str(uuid4()),
         conversation_id=payload.conversation_id,
         customer_name=payload.customer_name.strip(),
         email=email,
         phone=payload.phone.strip(),
-        interest=payload.interest.strip() or "General inquiry",
+        interest=interest,
         channel=channel,
         created_at=utc_now(),
+        score=compute_lead_score(interest, channel),
     )
     db.add(lead_row)
     if conv_row:
