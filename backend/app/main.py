@@ -2141,16 +2141,36 @@ def _twiml_gather(say_text: str, action: str = "/voice/transcribed") -> str:
         .replace(">", " ")
         .replace('"', "'")
     )
-    # Clamp to ~350 chars so the TTS doesn't ramble
     if len(safe) > 350:
         safe = safe[:347] + "..."
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         "<Response>"
         f'<Gather input="speech" action="{action}" timeout="6" speechTimeout="auto" language="en-US">'
-        f'<Say voice="Polly.Joanna">{safe}</Say>'
+        f'<Say voice="Polly.Raveena">{safe}</Say>'
         "</Gather>"
-        "<Say voice=\"Polly.Joanna\">I didn't catch that. Thank you for calling OmniFlow AI. Goodbye!</Say>"
+        "<Say voice=\"Polly.Raveena\">I didn't catch that. Thank you for calling OmniFlow AI. Goodbye!</Say>"
+        "</Response>"
+    )
+
+
+def _twiml_say_and_record(say_text: str, action: str = "/voice/recording") -> str:
+    """TwiML that speaks text then records the caller — used for Whisper STT flow."""
+    safe = (
+        say_text
+        .replace("&", " and ")
+        .replace("<", " ")
+        .replace(">", " ")
+        .replace('"', "'")
+    )
+    if len(safe) > 350:
+        safe = safe[:347] + "..."
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Response>"
+        f'<Say voice="Polly.Raveena">{safe}</Say>'
+        f'<Record action="{action}" maxLength="30" timeout="4" finishOnKey="#" playBeep="false" transcribe="false"/>'
+        "<Say voice=\"Polly.Raveena\">I didn't catch that. Thank you for calling OmniFlow AI. Goodbye!</Say>"
         "</Response>"
     )
 
@@ -2185,9 +2205,8 @@ async def voice_incoming(request: Request, db: Session = Depends(get_db)):
             db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
         ))
 
-    twiml = _twiml_gather(
+    twiml = _twiml_say_and_record(
         "Hi! You've reached OmniFlow AI. How can I help you today?",
-        action="/voice/transcribed",
     )
     return Response(content=twiml, media_type="text/xml")
 
@@ -2291,6 +2310,127 @@ async def voice_transcribed(request: Request, db: Session = Depends(get_db)):
     # Speak AI reply + loop back for next turn
     return Response(
         content=_twiml_gather(ai_reply),
+        media_type="text/xml",
+    )
+
+
+@app.post("/voice/recording")
+async def voice_recording(request: Request, db: Session = Depends(get_db)):
+    """Twilio webhook — fires when <Record> finishes.
+
+    Downloads the audio file from Twilio, sends it to OpenAI Whisper for
+    accurate transcription (much better than Twilio's built-in STT for Indian
+    names and accents), then runs the same RAG + AI pipeline.
+    """
+    form          = await request.form()
+    call_sid      = str(form.get("CallSid", f"call_{uuid4().hex[:12]}"))
+    caller        = str(form.get("From", "Unknown"))
+    recording_url = str(form.get("RecordingUrl", "")).strip()
+
+    speech_result = ""
+
+    if recording_url and openai_client and twilio_account_sid and twilio_auth_token:
+        try:
+            audio_resp = http_requests.get(
+                recording_url + ".mp3",
+                auth=(twilio_account_sid, twilio_auth_token),
+                timeout=10,
+            )
+            if audio_resp.status_code == 200:
+                audio_bytes = io.BytesIO(audio_resp.content)
+                audio_bytes.name = "recording.mp3"
+                whisper_resp = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_bytes,
+                    language="en",
+                    prompt=(
+                        "OmniFlow AI support call. "
+                        "The caller may have an Indian name such as Vinay, Priya, Rahul, "
+                        "Ananya, Arjun, or a company name."
+                    ),
+                )
+                speech_result = whisper_resp.text.strip()
+        except Exception:
+            pass
+
+    if not speech_result:
+        return Response(
+            content=_twiml_say_and_record(
+                "I'm sorry, I didn't catch that. Could you please repeat that?"
+            ),
+            media_type="text/xml",
+        )
+
+    conv_id = f"call_{call_sid}"
+
+    conv = db.query(ConversationRow).filter(ConversationRow.id == conv_id).first()
+    if not conv:
+        digits  = re.sub(r"\D", "", caller)
+        display = f"Caller …{digits[-4:]}" if len(digits) >= 4 else f"Caller ({caller})"
+        conv = ConversationRow(
+            id=conv_id,
+            customer_name=display,
+            channel="phone",
+            status="active",
+            last_message=speech_result[:200],
+            updated_at=utc_now(),
+            unread_count=0,
+        )
+        db.add(conv)
+        db.commit()
+
+    history = [
+        row_to_message(r)
+        for r in db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conv_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    ]
+
+    db.add(MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="user",
+        body=speech_result,
+        created_at=utc_now(),
+    ))
+
+    chunks  = retrieve_knowledge(speech_result, db)
+    slots   = get_available_slots(db)
+    ai_reply, _ = generate_ai_response(speech_result, history, chunks, slots)
+
+    db.add(MessageRow(
+        id=str(uuid4()),
+        conversation_id=conv_id,
+        sender="ai",
+        body=ai_reply,
+        created_at=utc_now(),
+    ))
+
+    conv.last_message = ai_reply[:200]
+    conv.updated_at   = utc_now()
+    conv.unread_count = (conv.unread_count or 0) + 1
+
+    lead = try_capture_lead(conv, speech_result, history, db)
+    if lead:
+        sync_lead_to_sheets(lead)
+
+    if should_auto_escalate(speech_result, ai_reply):
+        conv.status = "escalated"
+
+    db.commit()
+
+    all_msgs = (
+        db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conv_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    )
+    _broadcast_conv_update(row_to_conversation(conv))
+    _broadcast_msg_update(conv_id, [row_to_message(r) for r in all_msgs])
+
+    return Response(
+        content=_twiml_say_and_record(ai_reply),
         media_type="text/xml",
     )
 
