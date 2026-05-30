@@ -162,6 +162,10 @@ export function escalateConversation(conversationId: string) {
   return apiFetch<Conversation>(`/escalate/${conversationId}`, { method: "POST" });
 }
 
+export function sendFollowUp(conversationId: string) {
+  return apiFetch<Message[]>(`/conversations/${conversationId}/followup`, { method: "POST" });
+}
+
 export function sendAgentMessage(conversationId: string, body: string) {
   return apiFetch<Message[]>("/messages/agent", {
     method: "POST",

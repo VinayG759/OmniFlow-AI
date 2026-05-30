@@ -69,6 +69,7 @@ import {
   NameValue,
   streamMessage,
   broadcastWhatsApp,
+  sendFollowUp,
   syncLeadsToSheets,
   toggleWorkflow,
   uploadDocument,
@@ -275,6 +276,7 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(false);
   const [isEscalating, setIsEscalating] = useState(false);
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [humanDraft, setHumanDraft] = useState("");
   const [isSendingHuman, setIsSendingHuman] = useState(false);
@@ -968,6 +970,20 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleFollowUp() {
+    if (!selectedConversation || selectedConversation.status === "escalated") return;
+    setIsSendingFollowUp(true);
+    try {
+      const updatedMessages = await sendFollowUp(selectedConversation.id);
+      setMessages(updatedMessages);
+      addToast("AI follow-up sent.", "success");
+    } catch {
+      addToast("Could not send follow-up. Check the backend server.", "error");
+    } finally {
+      setIsSendingFollowUp(false);
+    }
+  }
+
   async function handleHumanReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedConversation || !humanDraft.trim()) return;
@@ -1442,15 +1458,29 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {selectedConversation.status !== "escalated" && (
-                            <button
-                              onClick={handleEscalate}
-                              disabled={isEscalating}
-                              className="flex h-9 items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              type="button"
-                            >
-                              <AlertTriangle className="h-4 w-4" />
-                              {isEscalating ? "Transferring…" : "Escalate to Human"}
-                            </button>
+                            <>
+                              <button
+                                onClick={handleFollowUp}
+                                disabled={isSendingFollowUp}
+                                className="flex h-9 items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 text-sm font-medium text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                title="AI generates and sends a follow-up message"
+                              >
+                                {isSendingFollowUp
+                                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                                  : <Zap className="h-4 w-4" />}
+                                {isSendingFollowUp ? "Sending…" : "AI Follow-Up"}
+                              </button>
+                              <button
+                                onClick={handleEscalate}
+                                disabled={isEscalating}
+                                className="flex h-9 items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                              >
+                                <AlertTriangle className="h-4 w-4" />
+                                {isEscalating ? "Transferring…" : "Escalate to Human"}
+                              </button>
+                            </>
                           )}
                           {/* Live status dropdown */}
                           <select

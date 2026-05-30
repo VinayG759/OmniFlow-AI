@@ -1720,6 +1720,58 @@ def list_agents() -> dict:
     return {"agents": _AGENT_ROSTER}
 
 
+@app.post("/conversations/{conversation_id}/followup", response_model=list[Message])
+def send_followup(conversation_id: str, db: Session = Depends(get_db)) -> list[Message]:
+    """Generate and send an AI follow-up message for a conversation.
+    The AI is instructed to re-engage the customer based on the prior chat history."""
+    conv_row = db.query(ConversationRow).filter(ConversationRow.id == conversation_id).first()
+    if conv_row is None:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    if conv_row.status == "escalated":
+        raise HTTPException(status_code=400, detail="Cannot send AI follow-up on an escalated conversation.")
+
+    history = [
+        row_to_message(r)
+        for r in db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conversation_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    ]
+
+    followup_prompt = (
+        "The customer has not replied recently. "
+        "Write a short, friendly follow-up message (under 40 words) to re-engage them. "
+        "Reference their last topic if possible. Do not repeat the last AI message verbatim."
+    )
+
+    context_chunks = retrieve_knowledge(followup_prompt, db)
+    ai_body, _ = generate_ai_response(followup_prompt, history, context_chunks)
+
+    now = utc_now()
+    ai_msg_row = MessageRow(
+        id=str(uuid4()),
+        conversation_id=conversation_id,
+        sender="ai",
+        body=ai_body,
+        created_at=now,
+    )
+    db.add(ai_msg_row)
+    conv_row.last_message = ai_body
+    conv_row.updated_at   = now
+    db.commit()
+
+    all_msgs = (
+        db.query(MessageRow)
+        .filter(MessageRow.conversation_id == conversation_id)
+        .order_by(MessageRow.created_at)
+        .all()
+    )
+    result = [row_to_message(r) for r in all_msgs]
+    _broadcast_conv_update(row_to_conversation(conv_row))
+    _broadcast_msg_update(conversation_id, result)
+    return result
+
+
 @app.get("/leads/export")
 def export_leads_csv(db: Session = Depends(get_db)) -> Response:
     """Download all leads as a CSV file."""
