@@ -204,7 +204,7 @@ def sync_lead_to_sheets(lead_row) -> None:
 # ── Pydantic response schemas ─────────────────────────────────────────────────
 
 Sender             = Literal["user", "ai", "human"]
-Channel            = Literal["website", "whatsapp", "email", "facebook", "instagram", "phone"]
+Channel            = Literal["website", "whatsapp", "email", "facebook", "instagram", "phone", "linkedin"]
 ConversationStatus = Literal["active", "lead", "booked", "escalated"]
 
 

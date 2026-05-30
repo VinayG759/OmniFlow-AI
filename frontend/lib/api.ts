@@ -1,5 +1,5 @@
 export type ConversationStatus = "active" | "lead" | "booked" | "escalated";
-export type Channel = "website" | "whatsapp" | "email" | "facebook" | "instagram" | "phone";
+export type Channel = "website" | "whatsapp" | "email" | "facebook" | "instagram" | "phone" | "linkedin";
 export type Sender = "user" | "ai" | "human";
 
 export type Conversation = {

@@ -37,6 +37,8 @@ import {
   Share2,
   RefreshCw,
   ArrowRight,
+  Briefcase,
+  Clock,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -115,6 +117,7 @@ const channelMeta: Record<Channel, { label: string; icon: typeof MessageSquareTe
   facebook:  { label: "Facebook",  icon: Share2 },
   instagram: { label: "Instagram", icon: Camera },
   phone:     { label: "Phone",     icon: Phone },
+  linkedin:  { label: "LinkedIn",  icon: Briefcase },
 };
 
 type ChannelTheme = {
@@ -195,6 +198,17 @@ const channelTheme: Record<Channel, ChannelTheme> = {
     sendBtn:    "bg-teal-600 hover:bg-teal-500 text-white",
     focusRing:  "focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
     headerBar:  "bg-teal-700",
+  },
+  linkedin: {
+    avatarBg:   "bg-[#0A66C2]",
+    badgeBg:    "bg-blue-50 text-blue-700 ring-blue-200",
+    chatBg:     "bg-neutral-50",
+    userBubble: "bg-[#0A66C2] text-white",
+    userBadge:  "bg-white/20 text-white",
+    userTime:   "text-blue-100",
+    sendBtn:    "bg-[#0A66C2] hover:bg-blue-600 text-white",
+    focusRing:  "focus:border-blue-400 focus:ring-2 focus:ring-blue-100",
+    headerBar:  "bg-[#0A66C2]",
   },
 };
 
@@ -1305,6 +1319,7 @@ export default function DashboardPage() {
                       <option value="instagram">📸 Instagram</option>
                       <option value="email">✉️ Email</option>
                       <option value="phone">📞 Phone</option>
+                      <option value="linkedin">💼 LinkedIn</option>
                     </select>
                   </div>
 
@@ -1443,6 +1458,9 @@ export default function DashboardPage() {
                           )}
                           {selectedConversation.channel === "instagram" && (
                             <><Camera className="h-3.5 w-3.5" /><span>Instagram Direct</span></>
+                          )}
+                          {selectedConversation.channel === "linkedin" && (
+                            <><Briefcase className="h-3.5 w-3.5" /><span>LinkedIn Messaging</span></>
                           )}
                         </div>
                       )}
@@ -2748,6 +2766,82 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
+                </div>
+
+                {/* Channel Integrations */}
+                <div className="rounded-lg border border-neutral-200 bg-white p-5">
+                  <div className="flex items-center gap-2 border-b border-neutral-100 pb-4">
+                    <Globe className="h-4 w-4 text-neutral-500" />
+                    <h3 className="text-sm font-semibold">Channel Integrations</h3>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+
+                    {/* LinkedIn — pending approval */}
+                    <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0A66C2] text-white">
+                        <Briefcase className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-neutral-800">LinkedIn</p>
+                          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">
+                            <Clock className="h-2.5 w-2.5" />
+                            Pending
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          LinkedIn API access is under review. Once approved, OmniFlow will handle DMs and connection requests automatically.
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-2.5 flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-50"
+                          disabled
+                        >
+                          <Briefcase className="h-3 w-3" />
+                          Connect LinkedIn
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* WhatsApp — connected */}
+                    <div className="flex items-start gap-3 rounded-lg border border-green-100 bg-green-50 p-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#25D366] text-white">
+                        <Smartphone className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-neutral-800">WhatsApp</p>
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Active
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          Connected via WhatsApp Cloud API. Receiving messages and sending broadcasts.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Facebook — connected */}
+                    <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#1877F2] text-white">
+                        <Share2 className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-neutral-800">Facebook</p>
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Active
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          Connected via Facebook Graph API. Messenger conversations handled by AI.
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
 
                 {/* Save button */}
