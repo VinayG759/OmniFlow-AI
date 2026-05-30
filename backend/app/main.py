@@ -1442,6 +1442,16 @@ async def upload_document(
     return ingest_document(filename, kind, text, db)
 
 
+@app.delete("/documents/{document_id}", status_code=204)
+def delete_document(document_id: str, db: Session = Depends(get_db)) -> None:
+    doc = db.query(DocumentRow).filter(DocumentRow.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    db.query(KnowledgeChunkRow).filter(KnowledgeChunkRow.document_id == document_id).delete()
+    db.delete(doc)
+    db.commit()
+
+
 @app.get("/leads", response_model=list[Lead])
 def list_leads(db: Session = Depends(get_db)) -> list[Lead]:
     rows = db.query(LeadRow).order_by(LeadRow.created_at.desc()).all()

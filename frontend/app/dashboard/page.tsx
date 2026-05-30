@@ -76,6 +76,7 @@ import {
   syncLeadsToSheets,
   toggleWorkflow,
   uploadDocument,
+  deleteDocument,
   Workflow,
   WorkflowAction,
   WorkflowCondition,
@@ -725,6 +726,15 @@ export default function DashboardPage() {
       addToast("Choose a TXT, Markdown, or PDF file first.", "info");
       return;
     }
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      addToast("File exceeds 10 MB limit. Please upload a smaller file.", "error");
+      return;
+    }
+    const ext = selectedFile.name.split(".").pop()?.toLowerCase();
+    if (!["txt", "md", "pdf"].includes(ext ?? "")) {
+      addToast("Unsupported file type. Only PDF, TXT, and Markdown (.md) are allowed.", "error");
+      return;
+    }
     setIsUploading(true);
     try {
       const uploaded = await uploadDocument(selectedFile);
@@ -736,6 +746,17 @@ export default function DashboardPage() {
       addToast(error instanceof Error ? error.message : "Document upload failed.", "error");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleDeleteDocument(id: string, name: string) {
+    if (!confirm(`Remove "${name}" from the knowledge base?`)) return;
+    try {
+      await deleteDocument(id);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      addToast(`"${name}" removed.`);
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : "Delete failed.", "error");
     }
   }
 
@@ -1657,7 +1678,8 @@ export default function DashboardPage() {
                 KNOWLEDGE BASE section
             ══════════════════════════════════════ */}
             {activeSection === "Knowledge Base" && (
-              <section className="mt-5 grid gap-5 rounded-lg border border-neutral-200 bg-white p-5 xl:grid-cols-[1fr_420px]">
+              <section className="mt-5 grid gap-5 rounded-lg border border-neutral-200 bg-white p-5 xl:grid-cols-[1fr_380px]">
+                {/* Left — document list */}
                 <div>
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-100 text-cyan-700">
@@ -1666,7 +1688,7 @@ export default function DashboardPage() {
                     <div>
                       <h2 className="text-lg font-semibold">Knowledge Base</h2>
                       <p className="text-sm text-neutral-500">
-                        Seeded FAQ plus uploaded files are used as chat context.
+                        Uploaded documents are used as AI context when answering customer queries.
                       </p>
                     </div>
                   </div>
@@ -1682,50 +1704,114 @@ export default function DashboardPage() {
                             <div className="h-3 w-1/3 rounded bg-neutral-100" />
                           </div>
                         ))
-                      : documents.map((doc) => (
-                          <article
-                            key={doc.id}
-                            className="rounded-md border border-neutral-200 bg-neutral-50 p-4"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="truncate text-sm font-semibold">{doc.name}</p>
-                              <span className="rounded-md bg-white px-2 py-1 text-xs font-medium uppercase text-neutral-500">
-                                {doc.kind}
-                              </span>
-                            </div>
-                            <p className="mt-3 text-sm text-neutral-500">
-                              {doc.chunk_count} chunks indexed
-                            </p>
-                          </article>
-                        ))
+                      : documents.length === 0
+                      ? (
+                          <div className="col-span-full flex flex-col items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 py-12 text-center">
+                            <FileText className="h-8 w-8 text-neutral-300" />
+                            <p className="mt-3 text-sm font-medium text-neutral-500">No documents yet</p>
+                            <p className="mt-1 text-xs text-neutral-400">Upload a PDF, TXT, or Markdown file to train your AI</p>
+                          </div>
+                        )
+                      : documents.map((doc) => {
+                          const kindLabel: Record<string, string> = { pdf: "PDF", text: "TXT", seed: "Built-in", md: "MD", markdown: "MD" };
+                          const kindColor: Record<string, string> = {
+                            pdf: "bg-red-50 text-red-600",
+                            text: "bg-blue-50 text-blue-600",
+                            seed: "bg-purple-50 text-purple-600",
+                            md: "bg-green-50 text-green-600",
+                            markdown: "bg-green-50 text-green-600",
+                          };
+                          return (
+                            <article
+                              key={doc.id}
+                              className="group relative rounded-md border border-neutral-200 bg-neutral-50 p-4"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="truncate text-sm font-semibold leading-snug">{doc.name}</p>
+                                <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${kindColor[doc.kind] ?? "bg-neutral-100 text-neutral-500"}`}>
+                                  {kindLabel[doc.kind] ?? doc.kind.toUpperCase()}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-neutral-400">
+                                {doc.chunk_count} chunk{doc.chunk_count !== 1 ? "s" : ""} indexed
+                              </p>
+                              {doc.kind !== "seed" && (
+                                <button
+                                  onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                  className="absolute right-2 top-2 hidden rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                                  title="Remove document"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </article>
+                          );
+                        })
                     }
                   </div>
                 </div>
 
+                {/* Right — upload form */}
                 <form
                   onSubmit={handleUploadDocument}
-                  className="rounded-md border border-neutral-200 bg-neutral-50 p-4"
+                  className="flex flex-col gap-4 rounded-md border border-neutral-200 bg-neutral-50 p-5"
                 >
-                  <label className="block text-sm font-semibold text-neutral-700">
-                    Upload document
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-700">Upload Document</h3>
+                    <p className="mt-0.5 text-xs text-neutral-400">Train your AI with FAQs, product docs, or SOPs</p>
+                  </div>
+
+                  {/* Supported formats */}
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-neutral-500">Supported formats</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "PDF", desc: "Product docs, SOPs", color: "bg-red-50 text-red-600 border-red-100" },
+                        { label: "TXT", desc: "Plain text files",  color: "bg-blue-50 text-blue-600 border-blue-100" },
+                        { label: "MD",  desc: "Markdown files",    color: "bg-green-50 text-green-600 border-green-100" },
+                      ].map(({ label, desc, color }) => (
+                        <div key={label} className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 ${color}`}>
+                          <span className="text-xs font-bold">{label}</span>
+                          <span className="text-xs opacity-70">{desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-neutral-400">Max file size: 10 MB</p>
+                  </div>
+
+                  {/* File input */}
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-600">Choose file</span>
                     <input
                       accept=".txt,.md,.pdf"
-                      className="mt-3 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-950 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+                      className="mt-1.5 block w-full cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-neutral-950 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-neutral-800"
                       onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                       type="file"
                     />
                   </label>
+
+                  {/* Selected file info */}
+                  {selectedFile && (
+                    <div className="flex items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2">
+                      <span className="truncate text-xs font-medium text-neutral-700">{selectedFile.name}</span>
+                      <span className="ml-2 shrink-0 text-xs text-neutral-400">
+                        {selectedFile.size < 1024 * 1024
+                          ? `${(selectedFile.size / 1024).toFixed(1)} KB`
+                          : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                      </span>
+                    </div>
+                  )}
+
                   <button
-                    className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isUploading}
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isUploading || !selectedFile}
                     type="submit"
                   >
                     {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
                     ) : (
-                      <FileText className="h-4 w-4" />
+                      <><FileText className="h-4 w-4" /> Add to Knowledge Base</>
                     )}
-                    Add to Knowledge Base
                   </button>
                 </form>
               </section>

@@ -303,3 +303,13 @@ export async function uploadDocument(file: File) {
 
   return response.json() as Promise<KnowledgeDocument>;
 }
+
+export async function deleteDocument(id: string) {
+  const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? `Delete failed: ${response.status}`);
+  }
+}
