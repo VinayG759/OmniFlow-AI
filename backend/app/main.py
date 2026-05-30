@@ -2328,6 +2328,10 @@ async def voice_recording(request: Request, db: Session = Depends(get_db)):
     recording_url = str(form.get("RecordingUrl", "")).strip()
 
     speech_result = ""
+    print(f"[voice/recording] CallSid={call_sid} RecordingUrl={recording_url!r} "
+          f"openai_client={'yes' if openai_client else 'NO'} "
+          f"twilio_sid={'yes' if twilio_account_sid else 'NO'} "
+          f"twilio_token={'yes' if twilio_auth_token else 'NO'}")
 
     if recording_url and openai_client and twilio_account_sid and twilio_auth_token:
         try:
@@ -2336,6 +2340,7 @@ async def voice_recording(request: Request, db: Session = Depends(get_db)):
                 auth=(twilio_account_sid, twilio_auth_token),
                 timeout=10,
             )
+            print(f"[voice/recording] audio download status={audio_resp.status_code} bytes={len(audio_resp.content)}")
             if audio_resp.status_code == 200:
                 audio_bytes = io.BytesIO(audio_resp.content)
                 audio_bytes.name = "recording.mp3"
@@ -2350,13 +2355,21 @@ async def voice_recording(request: Request, db: Session = Depends(get_db)):
                     ),
                 )
                 speech_result = whisper_resp.text.strip()
-        except Exception:
-            pass
+                print(f"[voice/recording] Whisper transcript: {speech_result!r}")
+        except Exception as exc:
+            print(f"[voice/recording] Whisper ERROR: {exc}")
+
+    # Fallback to Twilio built-in STT if Whisper unavailable/failed
+    if not speech_result and not recording_url:
+        return Response(
+            content=_twiml_gather("I'm sorry, I didn't catch that. Could you please repeat that?"),
+            media_type="text/xml",
+        )
 
     if not speech_result:
         return Response(
             content=_twiml_say_and_record(
-                "I'm sorry, I didn't catch that. Could you please repeat that?"
+                "I'm sorry, I didn't catch that. Could you please try again?"
             ),
             media_type="text/xml",
         )
