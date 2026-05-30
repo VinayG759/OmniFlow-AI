@@ -105,10 +105,19 @@ def send_whatsapp_reply(to: str, body: str) -> None:
         pass  # never crash the webhook handler if the outbound call fails
 
 
-def send_whatsapp_template(to: str, template_name: str = "hello_world", language_code: str = "en_US") -> None:
-    """Send a WhatsApp template message — required to initiate a conversation (no prior customer message)."""
+def send_whatsapp_template(to: str, template_name: str = "hello_world", language_code: str = "en_US", body_text: str | None = None) -> None:
+    """Send a WhatsApp template message — required to initiate a conversation (no prior customer message).
+    If body_text is provided it is passed as the {{1}} component parameter for templates that have a variable."""
     if not wa_phone_number_id or not wa_access_token:
         return
+    template_payload: dict = {"name": template_name, "language": {"code": language_code}}
+    if body_text:
+        template_payload["components"] = [
+            {
+                "type": "body",
+                "parameters": [{"type": "text", "text": body_text}],
+            }
+        ]
     try:
         http_requests.post(
             f"https://graph.facebook.com/v19.0/{wa_phone_number_id}/messages",
@@ -120,7 +129,7 @@ def send_whatsapp_template(to: str, template_name: str = "hello_world", language
                 "messaging_product": "whatsapp",
                 "to": to,
                 "type": "template",
-                "template": {"name": template_name, "language": {"code": language_code}},
+                "template": template_payload,
             },
             timeout=10,
         )
@@ -1737,14 +1746,14 @@ def export_leads_csv(db: Session = Depends(get_db)) -> Response:
 @app.post("/broadcast")
 def broadcast_whatsapp(payload: BroadcastPayload, db: Session = Depends(get_db)):
     """Send a WhatsApp template message to all leads from the WhatsApp channel that have a phone number.
-    Uses send_whatsapp_template (hello_world) to initiate the conversation — required by Meta when no
-    prior customer message exists. Free-text reply is used only inside active 24h customer service windows."""
+    Uses the 'omniflow_broadcast' template (body = {{1}}) so the custom message text is delivered.
+    Falls back to 'hello_world' if the custom template is not yet approved."""
     whatsapp_leads = db.query(LeadRow).filter(LeadRow.channel == "whatsapp").all()
     sent = 0
     skipped = 0
     for lead in whatsapp_leads:
         if lead.phone:
-            send_whatsapp_template(lead.phone)
+            send_whatsapp_template(lead.phone, template_name="omniflow_broadcast", body_text=payload.message)
             sent += 1
         else:
             skipped += 1
