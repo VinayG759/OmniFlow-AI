@@ -1,4 +1,4 @@
-export type ConversationStatus = "active" | "lead" | "booked" | "escalated";
+export type ConversationStatus = "active" | "lead" | "booked" | "escalated" | "resolved";
 export type Channel = "website" | "whatsapp" | "email" | "facebook" | "instagram" | "phone" | "linkedin";
 export type Sender = "user" | "ai" | "human";
 
