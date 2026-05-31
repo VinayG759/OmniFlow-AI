@@ -906,6 +906,12 @@ def mock_ai_response(
     user_history = [m.body for m in (history or []) if m.sender == "user"]
     context_answer = answer_from_context(user_message, context_chunks or [])
     known_name = customer_name if customer_name and not is_generic_name(customer_name) else None
+    all_user_text = " ".join(user_history) + " " + user_message
+    email_already_shared = bool(extract_email(all_user_text))
+    _EMAIL_ASK = (
+        "\n\nTo keep you updated and send you the full details, could you share your email? "
+        "It'll only take a second! 😊"
+    )
 
     # ── Greetings and small talk — respond naturally, no booking push ──
     if message in _GREETINGS or len(message.split()) <= 3 and not any(
@@ -933,6 +939,12 @@ def mock_ai_response(
         return "I do not see an earlier question in this conversation yet."
 
     if context_answer:
+        # Append email-ask if high intent detected and no email yet
+        _has_intent = any(t in message for t in [
+            "price", "pricing", "plan", "cost", "demo", "book", "trial", "feature", "update",
+        ])
+        if _has_intent and not email_already_shared:
+            return context_answer + _EMAIL_ASK
         return context_answer
 
     # Booking intent takes priority — must come before factual guard
@@ -958,6 +970,8 @@ def mock_ai_response(
         "refund", "return", "policy", "address", "location",
     ])
     if is_factual:
+        if not email_already_shared:
+            return _NO_CONTEXT_REPLY + _EMAIL_ASK
         return _NO_CONTEXT_REPLY
 
     if "refund" in message or "urgent" in message or "angry" in message:
@@ -982,6 +996,7 @@ def generate_ai_response(
     context_chunks: list[KnowledgeChunk],
     available_slots: list[str] | None = None,
     customer_name: str | None = None,
+    email_captured: bool = False,
 ) -> tuple[str, str]:
     """Generate an AI reply. Returns (reply_text, provider_name)."""
     knowledge_context = build_context(context_chunks)
@@ -1031,8 +1046,15 @@ def generate_ai_response(
         "connect you with someone right now. What works best?' "
 
         # ── Lead capture rule ──
-        "If the user shows buying intent or asks about pricing or demos, be enthusiastic "
-        "and guide them toward booking a call or starting a free trial. "
+        + (
+            "If the user shows buying intent, asks about pricing, plans, or demos, "
+            "answer their question AND then ask for their email address to follow up. "
+            "Say something like: 'To send you the full details and keep you updated, "
+            "could you share your email? It only takes a second!' "
+            if not email_captured else
+            "The customer has already shared their email — do NOT ask for it again. "
+            "Focus on answering their question and moving them toward booking a demo or call. "
+        )
 
         # ── Escalation rule ──
         "If the user is frustrated or asks for a refund, acknowledge their concern warmly "
@@ -2093,11 +2115,15 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
             ai_source = "system"
         else:
             # Normal AI path — inject available slots if booking intent detected
-            context_chunks = retrieve_knowledge(payload.body, db)
-            slots_for_ai   = available if has_booking_intent(payload.body) else None
+            context_chunks  = retrieve_knowledge(payload.body, db)
+            slots_for_ai    = available if has_booking_intent(payload.body) else None
+            # Check if any email has already been shared in this conversation
+            all_user_text   = " ".join(m.body for m in prev_history if m.sender == "user")
+            email_captured  = bool(extract_email(all_user_text) or extract_email(payload.body))
             ai_body, ai_source = generate_ai_response(
                 payload.body, prev_history, context_chunks, slots_for_ai,
                 customer_name=conv_row.customer_name,
+                email_captured=email_captured,
             )
 
     # Stage AI message
