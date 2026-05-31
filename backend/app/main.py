@@ -186,6 +186,16 @@ def send_instagram_reply(recipient_id: str, body: str) -> None:
         pass
 
 
+def forward_to_channel(conv_row, body: str) -> None:
+    """Send a message to the customer on their original channel (WhatsApp / Facebook / Instagram)."""
+    if conv_row.channel == "whatsapp" and conv_row.id.startswith("wa_"):
+        send_whatsapp_reply(conv_row.id[3:], body)
+    elif conv_row.channel == "facebook" and conv_row.id.startswith("fb_"):
+        send_facebook_reply(conv_row.id[3:], body)
+    elif conv_row.channel == "instagram" and conv_row.id.startswith("ig_"):
+        send_instagram_reply(conv_row.id[3:], body)
+
+
 def sync_lead_to_sheets(lead_row) -> None:
     """Auto-append a newly captured lead to Google Sheets (if configured)."""
     if not gs_credentials_path or not gs_sheet_id:
@@ -1864,6 +1874,7 @@ def escalate_conversation(
     db.add(handoff_msg)
     conv.last_message = handoff_text
     db.commit()
+    forward_to_channel(conv, handoff_text)
     return row_to_conversation(conv)
 
 
@@ -1891,6 +1902,7 @@ def send_agent_message(payload: AgentMessageCreate, db: Session = Depends(get_db
     conv_row.last_message = payload.body
     conv_row.updated_at = now
     db.commit()
+    forward_to_channel(conv_row, payload.body)
 
     rows = (
         db.query(MessageRow)
