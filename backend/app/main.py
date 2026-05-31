@@ -815,9 +815,14 @@ def detect_slot_from_message(message: str, available_slots: list[str]) -> str | 
 _FACTUAL_QUERY_TERMS: frozenset[str] = frozenset([
     "price", "pricing", "cost", "plan", "starter", "growth", "business",
     "hour", "open", "support", "time", "timezone", "ist",
-    "service", "offer", "feature", "do you", "can you", "integrate", "integration",
-    "refund", "return", "policy", "address", "location", "contact",
+    "service", "offer", "feature", "integrate", "integration",
+    "refund", "return", "policy", "address", "location",
     "trial", "free trial", "discount", "enterprise", "warranty",
+])
+
+_BOOKING_INTENT_TERMS: frozenset[str] = frozenset([
+    "book", "booking", "demo", "appointment", "schedule", "slot", "slots",
+    "available", "calendar", "reserve", "meeting", "call",
 ])
 
 _NO_CONTEXT_REPLY = (
@@ -826,8 +831,15 @@ _NO_CONTEXT_REPLY = (
 )
 
 
+def is_booking_intent(message: str) -> bool:
+    lower = message.lower()
+    return any(t in lower for t in _BOOKING_INTENT_TERMS)
+
+
 def is_factual_business_query(message: str) -> bool:
     lower = message.lower()
+    if is_booking_intent(lower):
+        return False
     return any(t in lower for t in _FACTUAL_QUERY_TERMS)
 
 
@@ -878,20 +890,21 @@ def mock_ai_response(
     if context_answer:
         return context_answer
 
-    is_factual = any(t in message for t in [
-        "price", "pricing", "cost", "plan", "starter", "growth", "business",
-        "hour", "open", "support", "time", "timezone", "ist",
-        "service", "offer", "feature", "do you", "can you", "integrate", "integration",
-        "refund", "return", "policy", "address", "location", "contact",
-    ])
-    if is_factual:
-        return _NO_CONTEXT_REPLY
-
-    if any(t in message for t in ["demo", "appointment", "book", "schedule", "slot", "available", "calendar"]):
+    # Booking intent takes priority — must come before factual guard
+    if any(t in message for t in _BOOKING_INTENT_TERMS):
         if available_slots:
             slot_list = "\n".join(f"• {s}" for s in available_slots[:6])
             return f"Here are the available appointment slots:\n{slot_list}\n\nWhich time works best for you?"
-        return "Absolutely. I can help schedule a demo. Could you share your name, email, and preferred time?"
+        return "Absolutely! I can help you book a demo. Could you share your name, email, and preferred time?"
+
+    is_factual = any(t in message for t in [
+        "price", "pricing", "cost", "plan", "starter", "growth", "business",
+        "hour", "open", "support", "time", "timezone", "ist",
+        "service", "offer", "feature", "integrate", "integration",
+        "refund", "return", "policy", "address", "location",
+    ])
+    if is_factual:
+        return _NO_CONTEXT_REPLY
 
     if "refund" in message or "urgent" in message or "angry" in message:
         return "I understand this needs attention. I am escalating this conversation to a human teammate now."
