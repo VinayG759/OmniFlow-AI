@@ -509,9 +509,11 @@ def answer_from_context(user_message: str, chunks: list[KnowledgeChunk]) -> str 
         matching = [s for s in sentences if any(t in s.lower() for t in q_terms)]
     if matching:
         body = ". ".join(matching)
-        return f"Based on our knowledge base: {body}{'.' if not body.endswith('.') else ''}"
+        answer = f"{body}{'.' if not body.endswith('.') else ''}"
+        return f"{answer}\n\nIs there anything else I can help you with, or would you like to book a call with our team?"
     fallback = ". ".join(sentences[:2])
-    return f"Based on our knowledge base: {fallback}{'.' if not fallback.endswith('.') else ''}"
+    answer = f"{fallback}{'.' if not fallback.endswith('.') else ''}"
+    return f"{answer}\n\nWould you like more details, or can I help you book a demo?"
 
 
 # ── Lead extraction helpers ───────────────────────────────────────────────────
@@ -826,8 +828,12 @@ _BOOKING_INTENT_TERMS: frozenset[str] = frozenset([
 ])
 
 _NO_CONTEXT_REPLY = (
-    "I don't have that information right now — please contact our support team "
-    "directly and they'll be happy to help! Is there anything else I can assist you with?"
+    "I want to make sure I give you the right answer, so let me connect you with our team for that one. "
+    "In the meantime, here's what I can help you with right now:\n"
+    "• Book a demo or schedule a call\n"
+    "• Answer questions about our plans and features\n"
+    "• Connect you with a human agent\n\n"
+    "What would you like to do?"
 )
 
 
@@ -874,9 +880,9 @@ def mock_ai_response(
         t in message for t in ["book", "price", "demo", "refund", "slot", "schedule"]
     ):
         greet_responses = [
-            "Hi there! 👋 How can I help you today?",
-            "Hello! How can I assist you today?",
-            "Hey! What can I help you with?",
+            "Hi there! Great to have you here. You can ask me about our plans, book a demo, or I can connect you with our team — what would you like to do?",
+            "Hello! Happy to help. Feel free to ask me anything about our product, pricing, or to schedule a call with us.",
+            "Hey! I'm here to help. Ask me about features, pricing, or just say 'book a demo' and we'll get you set up.",
         ]
         import hashlib
         idx = int(hashlib.md5(user_message.encode()).hexdigest(), 16) % len(greet_responses)
@@ -894,8 +900,17 @@ def mock_ai_response(
     if any(t in message for t in _BOOKING_INTENT_TERMS):
         if available_slots:
             slot_list = "\n".join(f"• {s}" for s in available_slots[:6])
-            return f"Here are the available appointment slots:\n{slot_list}\n\nWhich time works best for you?"
-        return "Absolutely! I can help you book a demo. Could you share your name, email, and preferred time?"
+            return (
+                f"I'd love to get that booked for you! Here are the available slots:\n{slot_list}\n\n"
+                "Just reply with your preferred time (or suggest another) and share your name and email — I'll confirm it right away."
+            )
+        return (
+            "Absolutely, I'd love to set that up! To book your demo, could you share:\n"
+            "• Your name\n"
+            "• Email address\n"
+            "• Preferred date and time\n\n"
+            "I'll get everything confirmed for you."
+        )
 
     is_factual = any(t in message for t in [
         "price", "pricing", "cost", "plan", "starter", "growth", "business",
@@ -907,11 +922,18 @@ def mock_ai_response(
         return _NO_CONTEXT_REPLY
 
     if "refund" in message or "urgent" in message or "angry" in message:
-        return "I understand this needs attention. I am escalating this conversation to a human teammate now."
+        return (
+            "I'm really sorry to hear that — you have my full attention. "
+            "I'm connecting you with a human teammate right now who will take care of this personally. "
+            "They'll be with you shortly."
+        )
 
     return (
-        "Thanks for reaching out! How can I help you today? "
-        "I can assist with product questions, pricing, booking a demo, or escalating to a human."
+        "Happy to help! Here's what I can do for you:\n"
+        "• Answer questions about our features and pricing\n"
+        "• Book a demo or schedule a call\n"
+        "• Connect you with a human agent\n\n"
+        "What would you like to start with?"
     )
 
 
@@ -929,38 +951,45 @@ def generate_ai_response(
         return _NO_CONTEXT_REPLY, "mock"
 
     instructions = (
-        "You are a friendly and professional customer support agent. "
-        "Answer questions based on the knowledge base provided. "
-        "Keep replies concise (under 100 words), helpful, and conversational. "
-        "Match the tone of the user — formal for emails, casual for chat. "
+        "You are a warm, helpful customer support agent for a business automation platform. "
+        "Keep replies concise (2-4 sentences max), friendly, and conversational. "
+        "Never sound robotic — write like a real person who genuinely wants to help. "
+        "Match tone to the user: casual for chat, slightly more formal for email. "
 
-        # ── Greeting / small-talk rule (highest priority) ──
-        "If the user's message is a greeting or casual small talk "
-        "(e.g. 'hi', 'hello', 'hey', 'how are you', 'thanks', etc.), "
-        "respond warmly and ask how you can help — do NOT mention bookings, "
-        "slots, or business topics unless the user brought it up first. "
+        # ── Always guide forward ──
+        "CRITICAL: Every single response must end with a clear next step for the customer. "
+        "Never leave them wondering what to do next. Close with a question, an offer, "
+        "or a short list of options they can choose from. "
+
+        # ── Greeting / small-talk rule ──
+        "If the user sends a greeting or small talk (hi, hello, thanks, etc.), "
+        "respond warmly and invite them to share what they need — do NOT mention "
+        "bookings or business topics unless the user brings them up first. "
 
         # ── Booking rule ──
-        "ONLY present booking slots when AVAILABLE BOOKING SLOTS are listed "
-        "AND the user explicitly asks to book, schedule, or check availability. "
-        "Never mention slots for greetings or unrelated questions. "
+        "When AVAILABLE BOOKING SLOTS are listed and the user wants to book or schedule, "
+        "show the slots clearly and ask which time works. If they've shared their name "
+        "and contact, acknowledge it warmly and confirm you're locking in the slot. "
 
         # ── Knowledge base rule ──
-        "When a KNOWLEDGE BASE CONTEXT section is present, answer ONLY from "
-        "that context. Do not add facts from your training data. "
-        "If the context does not contain the answer, say: "
-        "'I don't have that information right now — please contact our support "
-        "team directly and they'll be happy to help!' "
+        "When KNOWLEDGE BASE CONTEXT is present, answer from that context in natural "
+        "conversational language — do NOT say 'Based on our knowledge base'. "
+        "If the context doesn't fully answer the question, share what you do know "
+        "and offer to connect them with the team for more details. "
+
+        # ── Unknown / no context ──
+        "If you genuinely don't have the answer, never dead-end the customer. Instead say "
+        "something like: 'Let me get our team to help with that — they'll have the exact "
+        "details. Meanwhile, I can help you book a demo, answer general questions, or "
+        "connect you with someone right now. What works best?' "
 
         # ── Lead capture rule ──
-        "If the user expresses buying intent, interest in pricing, or asks for "
-        "a demo, be enthusiastic and guide them toward booking a call or "
-        "starting a free trial. "
+        "If the user shows buying intent or asks about pricing or demos, be enthusiastic "
+        "and guide them toward booking a call or starting a free trial. "
 
         # ── Escalation rule ──
-        "If the user sounds frustrated, angry, or asks for a refund, "
-        "acknowledge their concern empathetically and let them know you are "
-        "connecting them with a human agent right away. "
+        "If the user is frustrated or asks for a refund, acknowledge their concern warmly "
+        "and let them know you're connecting them with a human teammate right away. "
 
         "Never invent pricing, policies, or business details not in the context."
     )
