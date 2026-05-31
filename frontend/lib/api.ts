@@ -151,6 +151,10 @@ export function fetchLeads() {
   return apiFetch<Lead[]>("/leads");
 }
 
+export function deleteLead(id: string) {
+  return apiFetch<void>(`/leads/${id}`, { method: "DELETE" });
+}
+
 export function fetchBookings() {
   return apiFetch<Booking[]>("/bookings");
 }

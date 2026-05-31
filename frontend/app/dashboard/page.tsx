@@ -63,6 +63,7 @@ import {
   fetchConversations,
   fetchDocuments,
   fetchLeads,
+  deleteLead,
   fetchMessages,
   fetchWorkflowLogs,
   fetchWorkflows,
@@ -903,6 +904,16 @@ export default function DashboardPage() {
     a.click();
     URL.revokeObjectURL(url);
     addToast(`Exported ${bookings.length} booking${bookings.length !== 1 ? "s" : ""} as CSV.`);
+  }
+
+  async function handleDeleteLead(id: string) {
+    try {
+      await deleteLead(id);
+      setLeads((prev) => prev.filter((l) => l.id !== id));
+      addToast("Lead deleted.", "info");
+    } catch {
+      addToast("Failed to delete lead.", "error");
+    }
   }
 
   async function handleSyncSheets() {
@@ -1972,9 +1983,18 @@ export default function DashboardPage() {
                               <Tag className="h-3 w-3" />
                               <span className="capitalize">{lead.channel}</span>
                             </div>
-                            <span className="text-xs text-neutral-400">
-                              {formatDate(lead.created_at)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-neutral-400">
+                                {formatDate(lead.created_at)}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteLead(lead.id)}
+                                title="Delete lead"
+                                className="rounded p-1 text-neutral-400 transition hover:bg-red-50 hover:text-red-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </article>
                       );

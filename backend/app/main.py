@@ -1624,6 +1624,15 @@ def create_lead(payload: LeadCreate, db: Session = Depends(get_db)) -> Lead:
     return row_to_lead(lead_row)
 
 
+@app.delete("/leads/{lead_id}", status_code=204)
+def delete_lead(lead_id: str, db: Session = Depends(get_db)) -> None:
+    lead = db.query(LeadRow).filter(LeadRow.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    db.delete(lead)
+    db.commit()
+
+
 @app.post("/leads/sync-sheets")
 def sync_all_leads_to_sheets(db: Session = Depends(get_db)) -> dict:
     """Push all leads to the configured Google Sheet.
