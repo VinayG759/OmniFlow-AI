@@ -252,7 +252,7 @@ class Lead(BaseModel):
     id: str
     conversation_id: str
     customer_name: str
-    email: str
+    email: str | None = None
     phone: str
     interest: str
     channel: Channel
@@ -264,7 +264,7 @@ class Lead(BaseModel):
 class LeadCreate(BaseModel):
     conversation_id: str = Field(..., min_length=1)
     customer_name:   str = Field(..., min_length=1, max_length=120)
-    email:           str = Field(..., min_length=5, max_length=254)
+    email:           str | None = Field(default=None, max_length=254)
     phone:           str = Field(default="", max_length=30)
     interest:        str = Field(default="General inquiry", max_length=120)
 
@@ -647,7 +647,8 @@ def try_capture_lead(
     db: Session,
 ) -> LeadRow | None:
     """Stage a new lead row (caller must db.commit()).
-    Returns None if no email found or duplicate detected."""
+    Requires at least an email OR a phone number. Returns None if neither found."""
+    # ── Collect email (search current message + recent history) ──────────────
     email = extract_email(user_message)
     if not email:
         for msg in reversed(history[-8:]):
@@ -656,14 +657,32 @@ def try_capture_lead(
                 if found:
                     email = found
                     break
-    if not email:
-        return None
-    if "@" not in email or "." not in email.split("@", 1)[-1]:
-        return None
-    # Duplicate guard — check committed state
-    if db.query(LeadRow).filter(LeadRow.email == email).first():
+    if email and ("@" not in email or "." not in email.split("@", 1)[-1]):
+        email = None
+
+    # ── Collect phone (search current message + recent history) ──────────────
+    phone = extract_phone(user_message)
+    if not phone:
+        for msg in reversed(history[-10:]):
+            if msg.sender == "user":
+                phone = extract_phone(msg.body)
+                if phone:
+                    break
+
+    # Need at least one contact identifier
+    if not email and not phone:
         return None
 
+    # ── Duplicate guard ───────────────────────────────────────────────────────
+    if email and db.query(LeadRow).filter(LeadRow.email == email).first():
+        return None
+    if not email and phone and db.query(LeadRow).filter(LeadRow.phone == phone).first():
+        return None
+    # One lead per conversation regardless
+    if db.query(LeadRow).filter(LeadRow.conversation_id == conv_row.id).first():
+        return None
+
+    # ── Collect name ──────────────────────────────────────────────────────────
     name = extract_name_from_text(user_message)
     if not name:
         for msg in reversed(history[-10:]):
@@ -672,14 +691,6 @@ def try_capture_lead(
                 if name:
                     break
     name = name or conv_row.customer_name
-
-    phone = extract_phone(user_message)
-    if not phone:
-        for msg in reversed(history[-10:]):
-            if msg.sender == "user":
-                phone = extract_phone(msg.body)
-                if phone:
-                    break
 
     all_user_text = " ".join(m.body for m in history if m.sender == "user") + " " + user_message
     lead_row = LeadRow(
@@ -1303,6 +1314,19 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
             conn.commit()
         except Exception:
             conn.rollback()
+    # Allow phone-only leads: drop email NOT NULL constraint and old unique index
+    for stmt in [
+        "ALTER TABLE leads ALTER COLUMN email DROP NOT NULL",
+        "ALTER TABLE leads DROP CONSTRAINT IF EXISTS uq_leads_email",
+        "DROP INDEX IF EXISTS ix_leads_email",
+        "CREATE INDEX IF NOT EXISTS ix_leads_conversation_id ON leads (conversation_id)",
+    ]:
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa_text(stmt))
+                conn.commit()
+            except Exception:
+                conn.rollback()
 
     db: Session = SessionLocal()
     try:
@@ -1354,6 +1378,10 @@ def admin_migrate():
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_to VARCHAR",
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sentiment VARCHAR DEFAULT 'neutral'",
         "ALTER TABLE leads ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0",
+        "ALTER TABLE leads ALTER COLUMN email DROP NOT NULL",
+        "ALTER TABLE leads DROP CONSTRAINT IF EXISTS uq_leads_email",
+        "DROP INDEX IF EXISTS ix_leads_email",
+        "CREATE INDEX IF NOT EXISTS ix_leads_conversation_id ON leads (conversation_id)",
     ]
     for stmt in stmts:
         with engine.connect() as conn:

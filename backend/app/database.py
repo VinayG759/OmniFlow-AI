@@ -89,7 +89,7 @@ class LeadRow(Base):
     id              = Column(String, primary_key=True)
     conversation_id = Column(String, nullable=False)
     customer_name   = Column(String, nullable=False)
-    email           = Column(String, nullable=False)
+    email           = Column(String, nullable=True, default=None)
     phone           = Column(String, default="")
     interest        = Column(String, default="General inquiry")
     channel         = Column(String, nullable=False)
@@ -97,8 +97,7 @@ class LeadRow(Base):
     score           = Column(Integer, default=0)
 
     __table_args__ = (
-        UniqueConstraint("email", name="uq_leads_email"),
-        Index("ix_leads_email", "email"),
+        Index("ix_leads_conversation_id", "conversation_id"),
     )
 
 
