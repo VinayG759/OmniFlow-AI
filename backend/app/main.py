@@ -83,11 +83,14 @@ gs_sheet_id         = os.getenv("GOOGLE_SHEETS_ID", "")
 
 
 def send_whatsapp_reply(to: str, body: str) -> None:
-    """Send a WhatsApp text message back to the customer via the Cloud API."""
+    """Send a WhatsApp text message back to the customer via the Cloud API.
+    If Meta rejects with error 131047 (24-hour window expired), falls back to
+    the hello_world template so the customer still gets a response."""
     if not wa_phone_number_id or not wa_access_token:
-        return  # credentials not configured — skip silently
+        print("[WhatsApp] Skipping reply — credentials not configured")
+        return
     try:
-        http_requests.post(
+        resp = http_requests.post(
             f"https://graph.facebook.com/v19.0/{wa_phone_number_id}/messages",
             headers={
                 "Content-Type": "application/json",
@@ -101,8 +104,18 @@ def send_whatsapp_reply(to: str, body: str) -> None:
             },
             timeout=10,
         )
-    except Exception:
-        pass  # never crash the webhook handler if the outbound call fails
+        if resp.status_code != 200:
+            data = resp.json()
+            error_code = (data.get("error") or {}).get("code")
+            print(f"[WhatsApp] Reply failed ({resp.status_code}): {data}")
+            # 131047 = outside 24-hour customer service window
+            if error_code == 131047:
+                print(f"[WhatsApp] 24-hour window expired for {to} — sending template fallback")
+                send_whatsapp_template(to)
+        else:
+            print(f"[WhatsApp] Reply sent to {to}")
+    except Exception as exc:
+        print(f"[WhatsApp] Exception sending reply to {to}: {exc}")
 
 
 def send_whatsapp_template(to: str, template_name: str = "hello_world", language_code: str = "en_US", body_text: str | None = None) -> None:
@@ -2346,8 +2359,9 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                     if ai_msgs:
                         send_whatsapp_reply(from_number, ai_msgs[-1].body)
 
-    except Exception:
-        pass  # swallow all errors — always return 200 to Meta
+    except Exception as exc:
+        print(f"[WhatsApp webhook] Error processing payload: {exc}")
+        # Always return 200 — Meta retries on any non-200 which causes duplicate messages
 
     return {"status": "ok"}
 
