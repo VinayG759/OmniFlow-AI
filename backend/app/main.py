@@ -618,12 +618,16 @@ _POSITIVE_KEYWORDS: frozenset[str] = frozenset([
     "great", "thanks", "thank you", "helpful", "perfect", "awesome", "love",
     "excellent", "amazing", "wonderful", "good", "nice", "happy", "pleased",
     "fantastic", "brilliant", "superb", "appreciate", "grateful",
+    "satisfied", "glad", "smooth", "easy", "recommend", "impressive",
+    "delighted", "outstanding", "exceptional", "reliable", "fast",
 ])
 _NEGATIVE_KEYWORDS: frozenset[str] = frozenset([
     "angry", "terrible", "worst", "hate", "disgusting", "awful", "horrible",
     "bad", "frustrated", "useless", "disappointed", "unacceptable", "refund",
     "urgent", "asap", "emergency", "scam", "fraud", "furious", "ridiculous",
     "pathetic", "waste", "broken", "never works",
+    "upset", "annoyed", "poor", "slow", "cheated", "unhappy", "dissatisfied",
+    "unreliable", "buggy", "crashing", "not working", "doesn't work",
 ])
 
 
