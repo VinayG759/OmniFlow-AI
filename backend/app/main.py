@@ -1050,6 +1050,12 @@ def generate_ai_response(
             "If the context doesn't fully answer the question, share what you do know "
             "and offer to connect them with the team for more details. "
 
+            "CRITICAL: Never make up facts, prices, names, policies, or any detail not explicitly "
+            "in the knowledge base context. If the question is outside your knowledge base — "
+            "whether it's personal, general knowledge, off-topic, or something not covered in "
+            "the documents — say clearly and honestly: 'I don't have information on that, but "
+            "I can connect you with our team who can help!' Then offer a next step. "
+            "Never guess. Never invent. Never answer outside your context just to seem helpful. "
             "If you genuinely don't have the answer, never dead-end the customer. Instead say "
             "something like: 'Let me get our team to help with that — they'll have the exact "
             "details. Meanwhile, I can help you book a demo, answer general questions, or "
