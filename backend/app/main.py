@@ -2002,6 +2002,32 @@ def broadcast_whatsapp(payload: BroadcastPayload, db: Session = Depends(get_db))
     return {"sent": sent, "skipped": skipped, "total": len(whatsapp_leads)}
 
 
+@app.post("/admin/test-whatsapp")
+def test_whatsapp_message(payload: dict, db: Session = Depends(get_db)):
+    """Send a test hello_world template to a specific phone number. Body: {\"to\": \"918904127547\"}"""
+    to = payload.get("to", "").strip()
+    if not to:
+        raise HTTPException(status_code=400, detail="Missing 'to' phone number")
+    if not wa_phone_number_id or not wa_access_token:
+        raise HTTPException(status_code=503, detail="WhatsApp credentials not configured")
+    import requests as _req
+    resp = _req.post(
+        f"https://graph.facebook.com/v19.0/{wa_phone_number_id}/messages",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {wa_access_token}",
+        },
+        json={
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "template",
+            "template": {"name": "hello_world", "language": {"code": "en_US"}},
+        },
+        timeout=10,
+    )
+    return {"status": resp.status_code, "response": resp.json()}
+
+
 @app.get("/bookings/export")
 def export_bookings_csv(db: Session = Depends(get_db)) -> Response:
     """Download all bookings as a CSV file."""
