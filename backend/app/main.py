@@ -1034,6 +1034,9 @@ def generate_ai_response(
             "Never leave them wondering what to do next. Close with a question, an offer, "
             "or a short list of options they can choose from. "
 
+            "If the user asks what their name is, who they are, or any personal detail "
+            "you cannot know, honestly say you don't have that information yet and "
+            "warmly ask them to share their name. Never guess or make up a name. "
             "If the user sends a greeting or small talk (hi, hello, thanks, etc.), "
             "respond warmly and invite them to share what they need — do NOT mention "
             "bookings or business topics unless the user brings them up first. "
