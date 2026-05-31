@@ -64,6 +64,7 @@ import {
   fetchDocuments,
   fetchLeads,
   deleteLead,
+  deleteConversation,
   fetchMessages,
   fetchWorkflowLogs,
   fetchWorkflows,
@@ -906,6 +907,17 @@ export default function DashboardPage() {
     addToast(`Exported ${bookings.length} booking${bookings.length !== 1 ? "s" : ""} as CSV.`);
   }
 
+  async function handleDeleteConversation(id: string) {
+    try {
+      await deleteConversation(id);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (selectedConversationId === id) setSelectedConversationId("");
+      addToast("Conversation deleted.", "info");
+    } catch {
+      addToast("Failed to delete conversation.", "error");
+    }
+  }
+
   async function handleDeleteLead(id: string) {
     try {
       await deleteLead(id);
@@ -1428,6 +1440,14 @@ export default function DashboardPage() {
                                 )}
                                 <span className="text-xs text-neutral-500">
                                   {formatTime(conversation.updated_at)}
+                                </span>
+                                <span
+                                  role="button"
+                                  title="Delete conversation"
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteConversation(conversation.id); }}
+                                  className="rounded p-0.5 text-neutral-300 transition hover:bg-red-50 hover:text-red-500 cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </span>
                               </div>
                             </div>

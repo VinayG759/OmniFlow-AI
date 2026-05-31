@@ -1914,6 +1914,16 @@ def assign_conversation(
     return row_to_conversation(conv)
 
 
+@app.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db)) -> None:
+    conv = db.query(ConversationRow).filter(ConversationRow.id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    db.query(MessageRow).filter(MessageRow.conversation_id == conversation_id).delete()
+    db.delete(conv)
+    db.commit()
+
+
 @app.get("/agents")
 def list_agents() -> dict:
     """Return the hardcoded agent roster."""

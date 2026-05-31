@@ -81,6 +81,10 @@ export function fetchConversations() {
   return apiFetch<Conversation[]>("/conversations");
 }
 
+export function deleteConversation(id: string) {
+  return apiFetch<void>(`/conversations/${id}`, { method: "DELETE" });
+}
+
 export function fetchAiStatus() {
   return apiFetch<AiStatus>("/ai/status");
 }
