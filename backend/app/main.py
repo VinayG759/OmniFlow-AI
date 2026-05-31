@@ -572,6 +572,13 @@ def is_generic_name(name: str) -> bool:
     return False
 
 
+_NOT_NAMES = {
+    "yes", "no", "ok", "okay", "sure", "fine", "good", "great", "nice", "cool",
+    "thanks", "thank", "hello", "hi", "hey", "bye", "please", "maybe", "nope",
+    "yep", "yup", "nah", "right", "correct", "exactly", "perfect", "agreed",
+    "understood", "noted", "done", "help", "support", "info", "details",
+}
+
 def extract_name_from_direct_reply(text: str) -> str | None:
     """Extract a name when we're specifically expecting one as a reply.
     More permissive than extract_name_from_text — handles bare 'Vinay' or 'Vinay Sharma'."""
@@ -583,6 +590,8 @@ def extract_name_from_direct_reply(text: str) -> str | None:
     cleaned = text.strip().strip("!.,?")
     words = cleaned.split()
     if 1 <= len(words) <= 3 and all(re.match(r"^[A-Za-z\-'\.]+$", w) for w in words):
+        if cleaned.lower() in _NOT_NAMES:
+            return None
         return " ".join(w.capitalize() for w in words)
     return None
 
