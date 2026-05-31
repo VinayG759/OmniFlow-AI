@@ -262,11 +262,12 @@ class Lead(BaseModel):
 
 
 class LeadCreate(BaseModel):
-    conversation_id: str = Field(..., min_length=1)
+    conversation_id: str = Field(default="manual", min_length=1)
     customer_name:   str = Field(..., min_length=1, max_length=120)
     email:           str | None = Field(default=None, max_length=254)
     phone:           str = Field(default="", max_length=30)
     interest:        str = Field(default="General inquiry", max_length=120)
+    channel:         str = Field(default="website", max_length=30)
 
 
 class Booking(BaseModel):
@@ -1592,20 +1593,25 @@ def list_leads(db: Session = Depends(get_db)) -> list[Lead]:
 
 @app.post("/leads", response_model=Lead, status_code=201)
 def create_lead(payload: LeadCreate, db: Session = Depends(get_db)) -> Lead:
-    email = payload.email.strip().lower()
-    if not _EMAIL_RE.fullmatch(email):
+    email = payload.email.strip().lower() if payload.email else None
+    phone = payload.phone.strip()
+    if not email and not phone:
+        raise HTTPException(status_code=422, detail="Provide at least an email or phone number.")
+    if email and not _EMAIL_RE.fullmatch(email):
         raise HTTPException(status_code=422, detail="Invalid email address.")
-    if db.query(LeadRow).filter(LeadRow.email == email).first():
+    if email and db.query(LeadRow).filter(LeadRow.email == email).first():
         raise HTTPException(status_code=409, detail="A lead with this email already exists.")
+    if not email and phone and db.query(LeadRow).filter(LeadRow.phone == phone).first():
+        raise HTTPException(status_code=409, detail="A lead with this phone already exists.")
     conv_row = db.query(ConversationRow).filter(ConversationRow.id == payload.conversation_id).first()
-    channel: Channel = conv_row.channel if conv_row else "website"
+    channel: Channel = conv_row.channel if conv_row else payload.channel  # type: ignore[assignment]
     interest = payload.interest.strip() or "General inquiry"
     lead_row = LeadRow(
         id=str(uuid4()),
         conversation_id=payload.conversation_id,
         customer_name=payload.customer_name.strip(),
         email=email,
-        phone=payload.phone.strip(),
+        phone=phone,
         interest=interest,
         channel=channel,
         created_at=utc_now(),
