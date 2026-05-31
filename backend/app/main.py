@@ -1028,35 +1028,29 @@ def generate_ai_response(
         "Never sound robotic — write like a real person who genuinely wants to help. "
         "Match tone to the user: casual for chat, slightly more formal for email. "
         + name_context
+        + (
+            "CRITICAL: Every single response must end with a clear next step for the customer. "
+            "Never leave them wondering what to do next. Close with a question, an offer, "
+            "or a short list of options they can choose from. "
 
-        # ── Always guide forward ──
-        "CRITICAL: Every single response must end with a clear next step for the customer. "
-        "Never leave them wondering what to do next. Close with a question, an offer, "
-        "or a short list of options they can choose from. "
+            "If the user sends a greeting or small talk (hi, hello, thanks, etc.), "
+            "respond warmly and invite them to share what they need — do NOT mention "
+            "bookings or business topics unless the user brings them up first. "
 
-        # ── Greeting / small-talk rule ──
-        "If the user sends a greeting or small talk (hi, hello, thanks, etc.), "
-        "respond warmly and invite them to share what they need — do NOT mention "
-        "bookings or business topics unless the user brings them up first. "
+            "When AVAILABLE BOOKING SLOTS are listed and the user wants to book or schedule, "
+            "show the slots clearly and ask which time works. If they've shared their name "
+            "and contact, acknowledge it warmly and confirm you're locking in the slot. "
 
-        # ── Booking rule ──
-        "When AVAILABLE BOOKING SLOTS are listed and the user wants to book or schedule, "
-        "show the slots clearly and ask which time works. If they've shared their name "
-        "and contact, acknowledge it warmly and confirm you're locking in the slot. "
+            "When KNOWLEDGE BASE CONTEXT is present, answer from that context in natural "
+            "conversational language — do NOT say 'Based on our knowledge base'. "
+            "If the context doesn't fully answer the question, share what you do know "
+            "and offer to connect them with the team for more details. "
 
-        # ── Knowledge base rule ──
-        "When KNOWLEDGE BASE CONTEXT is present, answer from that context in natural "
-        "conversational language — do NOT say 'Based on our knowledge base'. "
-        "If the context doesn't fully answer the question, share what you do know "
-        "and offer to connect them with the team for more details. "
-
-        # ── Unknown / no context ──
-        "If you genuinely don't have the answer, never dead-end the customer. Instead say "
-        "something like: 'Let me get our team to help with that — they'll have the exact "
-        "details. Meanwhile, I can help you book a demo, answer general questions, or "
-        "connect you with someone right now. What works best?' "
-
-        # ── Lead capture rule ──
+            "If you genuinely don't have the answer, never dead-end the customer. Instead say "
+            "something like: 'Let me get our team to help with that — they'll have the exact "
+            "details. Meanwhile, I can help you book a demo, answer general questions, or "
+            "connect you with someone right now. What works best?' "
+        )
         + (
             "If the user shows buying intent, asks about pricing, plans, or demos, "
             "answer their question AND then ask for their email address to follow up. "
@@ -1066,12 +1060,11 @@ def generate_ai_response(
             "The customer has already shared their email — do NOT ask for it again. "
             "Focus on answering their question and moving them toward booking a demo or call. "
         )
-
-        # ── Escalation rule ──
-        "If the user is frustrated or asks for a refund, acknowledge their concern warmly "
-        "and let them know you're connecting them with a human teammate right away. "
-
-        "Never invent pricing, policies, or business details not in the context."
+        + (
+            "If the user is frustrated or asks for a refund, acknowledge their concern warmly "
+            "and let them know you're connecting them with a human teammate right away. "
+            "Never invent pricing, policies, or business details not in the context."
+        )
     )
 
     transcript = build_conversation_transcript(history, user_message)
