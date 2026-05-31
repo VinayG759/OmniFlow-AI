@@ -556,6 +556,36 @@ def extract_name_from_text(text: str) -> str | None:
     return None
 
 
+_GENERIC_NAME_PREFIXES = ("fb user", "instagram user", "website visitor", "wa user", "phone user")
+
+def is_generic_name(name: str) -> bool:
+    """True when customer_name is a placeholder, not a real person's name."""
+    if not name:
+        return True
+    n = name.strip().lower()
+    if any(n.startswith(p) for p in _GENERIC_NAME_PREFIXES):
+        return True
+    # Pure phone number or wa_/ig_/fb_ ID
+    if re.match(r"^(\+?[\d][\d\s\-\(\)]{5,}[\d]|wa_\d+|ig_\d+|fb_\d+)$", n):
+        return True
+    return False
+
+
+def extract_name_from_direct_reply(text: str) -> str | None:
+    """Extract a name when we're specifically expecting one as a reply.
+    More permissive than extract_name_from_text — handles bare 'Vinay' or 'Vinay Sharma'."""
+    # Try structured patterns first ("my name is Vinay")
+    name = extract_name_from_text(text)
+    if name:
+        return name
+    # Short reply of 1-3 words that are all letters → treat as a name
+    cleaned = text.strip().strip("!.,?")
+    words = cleaned.split()
+    if 1 <= len(words) <= 3 and all(re.match(r"^[A-Za-z\-'\.]+$", w) for w in words):
+        return " ".join(w.capitalize() for w in words)
+    return None
+
+
 def detect_interest(user_texts: str) -> str:
     lower = user_texts.lower()
     if any(t in lower for t in ["demo", "walk", "walkthrough", "show me"]):
@@ -870,20 +900,29 @@ def mock_ai_response(
     history: list[Message] | None = None,
     context_chunks: list[KnowledgeChunk] | None = None,
     available_slots: list[str] | None = None,
+    customer_name: str | None = None,
 ) -> str:
     message = user_message.lower().strip().rstrip("!?.")
     user_history = [m.body for m in (history or []) if m.sender == "user"]
     context_answer = answer_from_context(user_message, context_chunks or [])
+    known_name = customer_name if customer_name and not is_generic_name(customer_name) else None
 
     # ── Greetings and small talk — respond naturally, no booking push ──
     if message in _GREETINGS or len(message.split()) <= 3 and not any(
         t in message for t in ["book", "price", "demo", "refund", "slot", "schedule"]
     ):
-        greet_responses = [
-            "Hi there! Great to have you here. You can ask me about our plans, book a demo, or I can connect you with our team — what would you like to do?",
-            "Hello! Happy to help. Feel free to ask me anything about our product, pricing, or to schedule a call with us.",
-            "Hey! I'm here to help. Ask me about features, pricing, or just say 'book a demo' and we'll get you set up.",
-        ]
+        if known_name:
+            greet_responses = [
+                f"Hi {known_name}! Great to have you here. You can ask me about our plans, book a demo, or I can connect you with our team — what would you like to do?",
+                f"Hello {known_name}! Happy to help. Feel free to ask me anything about our product, pricing, or to schedule a call with us.",
+                f"Hey {known_name}! Ask me about features, pricing, or just say 'book a demo' and we'll get you set up.",
+            ]
+        else:
+            greet_responses = [
+                "Hi there! Great to have you here. You can ask me about our plans, book a demo, or I can connect you with our team — what would you like to do?",
+                "Hello! Happy to help. Feel free to ask me anything about our product, pricing, or to schedule a call with us.",
+                "Hey! I'm here to help. Ask me about features, pricing, or just say 'book a demo' and we'll get you set up.",
+            ]
         import hashlib
         idx = int(hashlib.md5(user_message.encode()).hexdigest(), 16) % len(greet_responses)
         return greet_responses[idx]
@@ -942,6 +981,7 @@ def generate_ai_response(
     history: list[Message],
     context_chunks: list[KnowledgeChunk],
     available_slots: list[str] | None = None,
+    customer_name: str | None = None,
 ) -> tuple[str, str]:
     """Generate an AI reply. Returns (reply_text, provider_name)."""
     knowledge_context = build_context(context_chunks)
@@ -950,11 +990,18 @@ def generate_ai_response(
     if not context_chunks and is_factual_business_query(user_message):
         return _NO_CONTEXT_REPLY, "mock"
 
+    name_context = (
+        f"The customer's name is {customer_name}. Address them by name naturally — "
+        "use it in your opening or at least once to make the response feel personal. "
+        if customer_name and not is_generic_name(customer_name) else ""
+    )
+
     instructions = (
         "You are a warm, helpful customer support agent for a business automation platform. "
         "Keep replies concise (2-4 sentences max), friendly, and conversational. "
         "Never sound robotic — write like a real person who genuinely wants to help. "
         "Match tone to the user: casual for chat, slightly more formal for email. "
+        + name_context
 
         # ── Always guide forward ──
         "CRITICAL: Every single response must end with a clear next step for the customer. "
@@ -1016,14 +1063,14 @@ def generate_ai_response(
             )
             text = completion.choices[0].message.content or ""
             return (
-                text.strip() or mock_ai_response(user_message, history, context_chunks, available_slots),
+                text.strip() or mock_ai_response(user_message, history, context_chunks, available_slots, customer_name),
                 "groq",
             )
         except Exception:
-            return mock_ai_response(user_message, history, context_chunks, available_slots), "mock"
+            return mock_ai_response(user_message, history, context_chunks, available_slots, customer_name), "mock"
 
     if ai_provider != "openai" or openai_client is None:
-        return mock_ai_response(user_message, history, context_chunks, available_slots), "mock"
+        return mock_ai_response(user_message, history, context_chunks, available_slots, customer_name), "mock"
 
     try:
         response = openai_client.responses.create(
@@ -1038,7 +1085,7 @@ def generate_ai_response(
             "openai",
         )
     except Exception:
-        return mock_ai_response(user_message, history, context_chunks, available_slots), "mock"
+        return mock_ai_response(user_message, history, context_chunks, available_slots, customer_name), "mock"
 
 
 # ── Seed data ─────────────────────────────────────────────────────────────────
@@ -1969,6 +2016,14 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
     # Full history (prev + current) used for lead extraction
     full_history = prev_history + [row_to_message(user_msg_row)]
 
+    # ── Name collection for anonymous channels (FB, IG, website visitors, etc.) ─
+    _name_unknown = is_generic_name(conv_row.customer_name)
+    if _name_unknown:
+        extracted_name = extract_name_from_direct_reply(payload.body)
+        if extracted_name:
+            conv_row.customer_name = extracted_name
+            _name_unknown = False
+
     # ── Phase 8: already-escalated conversations → AI is paused ─────────────
     # Human agents handle these; just save the user message and return.
     if conv_row.status == "escalated":
@@ -2022,9 +2077,18 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
                 created_at=utc_now(),
             ))
             conv_row.status = "booked"
+            _name_label = f", {conv_row.customer_name}" if not is_generic_name(conv_row.customer_name) else ""
             ai_body = (
-                f"✅ Your appointment is confirmed for **{chosen_slot}**. "
+                f"✅ Your appointment is confirmed{_name_label} for **{chosen_slot}**. "
                 "We look forward to speaking with you! You will receive a confirmation shortly."
+            )
+            ai_source = "system"
+        elif _name_unknown and not any(m.sender == "ai" for m in prev_history):
+            # First ever message from an anonymous user — ask for their name before anything else
+            ai_body   = (
+                "Hi there! Welcome, I'm glad you reached out. 😊 "
+                "Before we get started, could I get your name? "
+                "It'll help me assist you better!"
             )
             ai_source = "system"
         else:
@@ -2032,7 +2096,8 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)) -> list[
             context_chunks = retrieve_knowledge(payload.body, db)
             slots_for_ai   = available if has_booking_intent(payload.body) else None
             ai_body, ai_source = generate_ai_response(
-                payload.body, prev_history, context_chunks, slots_for_ai
+                payload.body, prev_history, context_chunks, slots_for_ai,
+                customer_name=conv_row.customer_name,
             )
 
     # Stage AI message
